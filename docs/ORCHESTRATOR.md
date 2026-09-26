@@ -59,3 +59,32 @@ Live run:
 POST those bodies to `/api/orchestrator`.
 
 Phase 2 submits LinkedIn/Naukri on-site applications through the existing JobFinder engine. External ATS rows move to `ATS_QUEUED` and wait for the dedicated ATS engine rather than being guessed at.
+
+## 24x7 discovery loop
+
+When the Sheet orchestrator schedule is enabled, discovery scanning is enabled by default.
+A scheduled slot performs:
+
+1. scan all registered JobFinder sources when the scan interval is due
+2. export newly discovered, unmirrored jobs into `Automation Queue`
+3. deduplicate by canonical job key across sources
+4. ingest remote answers from `Interventions`
+5. process the refreshed LIFO queue
+
+Schedule controls:
+
+```json
+{
+  "profile_id": "...",
+  "enabled": true,
+  "armed": false,
+  "everyMinutes": 60,
+  "limit": 10,
+  "dailyCap": 30,
+  "scan": true,
+  "scanEveryMinutes": 60
+}
+```
+
+Set `armed:false` for discovery + autofill dry-runs with no final submission.
+
