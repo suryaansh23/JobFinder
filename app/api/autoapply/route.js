@@ -9,7 +9,8 @@
 // wrong is applications sent to real employers.
 
 import { get } from '../../../lib/db.js';
-import { autoApplyRun, eligibleByConnector } from '../../../lib/autoApply.js';
+import { eligibleByConnector } from '../../../lib/autoApply.js';
+import { guardedAutoApplyRun } from '../../../lib/guardedAutoApply.js';
 import { listNeedsInput, countNeedsInput } from '../../../lib/answerBank.js';
 import { derivedAnswer } from '../../../lib/derivedAnswers.js';
 import { readJson, requireFields, withErrorHandling, HttpError } from '../../../lib/http.js';
@@ -38,7 +39,7 @@ export const POST = withErrorHandling(async (req) => {
     ? `▶ Auto-apply — ARMED, up to ${limit} application(s) per board, LinkedIn and Naukri in parallel`
     : `▶ Auto-apply — dry run, up to ${limit} form(s) per board in parallel, submitting none`);
 
-  const summary = await autoApplyRun(profile, { armed, limit });
+  const summary = await guardedAutoApplyRun(profile, { armed, limit });
   summary.needsInputTotal = await countNeedsInput(profile_id);
   if (summary.needsInputTotal) {
     lwarn(profile_id, `  ❓ ${summary.needsInputTotal} question(s) waiting for you in the answer bank.`);
