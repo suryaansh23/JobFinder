@@ -57,6 +57,12 @@ jobs:
           if (-not (Test-Path (Join-Path $dest "scripts\JobFinder-Watchdog.ps1"))) { throw "watchdog missing" }
           & (Join-Path $dest "node\node.exe") --version
 
+      - name: Self-test Google Sheets setup helper
+        shell: powershell
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          & (Join-Path $dest "node\node.exe") (Join-Path $dest "scripts\google-sheets-setup.js") --self-test
+
       - name: Start 24x7 watchdog
         shell: powershell
         run: |

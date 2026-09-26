@@ -215,6 +215,9 @@ async function main() {
   cprf(path.join(HERE, 'installer', 'launcher.bat'), path.join(DIST, 'scripts', 'launcher.bat'));
   cprf(path.join(HERE, 'installer', 'server-only.bat'), path.join(DIST, 'scripts', 'server-only.bat'));
   cprf(path.join(HERE, 'installer', 'post-install-models.ps1'), path.join(DIST, 'scripts', 'post-install-models.ps1'));
+  cprf(path.join(HERE, 'installer', 'google-sheets-setup.js'), path.join(DIST, 'scripts', 'google-sheets-setup.js'));
+  cprf(path.join(HERE, 'installer', 'configure-google-sheets.bat'), path.join(DIST, 'scripts', 'configure-google-sheets.bat'));
+  cprf(path.join(HERE, 'installer', 'JobFinder.env.cmd.example'), path.join(DIST, 'scripts', 'JobFinder.env.cmd.example'));
   cprf(path.join(HERE, 'JobFinder-Watchdog.ps1'), path.join(DIST, 'scripts', 'JobFinder-Watchdog.ps1'));
   cprf(path.join(HERE, 'install-24x7.ps1'), path.join(DIST, 'scripts', 'install-24x7.ps1'));
   cprf(path.join(HERE, 'uninstall-24x7.ps1'), path.join(DIST, 'scripts', 'uninstall-24x7.ps1'));

@@ -37,7 +37,7 @@ if not exist "%SRC%app\server.js" (
 )
 
 REM --- 1. copy the application ------------------------------------------------
-echo   [1/5] Copying files...
+echo   [1/6] Copying files...
 if exist "%DEST%" (
     echo         Existing install found - updating in place.
     echo         Your data in %%APPDATA%%\JobFinder is left untouched.
@@ -56,7 +56,7 @@ if %ERRORLEVEL% GEQ 8 (
 echo         Done.
 
 REM --- 2. shortcuts -----------------------------------------------------------
-echo   [2/5] Creating shortcuts...
+echo   [2/6] Creating shortcuts...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$w=New-Object -ComObject WScript.Shell;" ^
   "foreach ($dir in @('%DESKTOP%','%STARTMENU%')) {" ^
@@ -71,7 +71,7 @@ if exist "%DESKTOP%\JobFinder.lnk" (echo         Desktop icon created.) else (ec
 
 REM --- 3. Ollama --------------------------------------------------------------
 echo.
-echo   [3/5] Local AI engine ^(Ollama^)
+echo   [3/6] Local AI engine ^(Ollama^)
 set "OLLAMA_EXE="
 where ollama >nul 2>nul && set "OLLAMA_EXE=ollama"
 if not defined OLLAMA_EXE if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
@@ -98,7 +98,7 @@ if defined OLLAMA_EXE (
 
 REM --- 4. models --------------------------------------------------------------
 echo.
-echo   [4/5] AI models
+echo   [4/6] AI models
 if not defined OLLAMA_EXE (
     echo         Ollama not available - skipping models.
     echo         Once you install it, run:  ollama pull qwen2.5:7b-instruct
@@ -106,9 +106,30 @@ if not defined OLLAMA_EXE (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\post-install-models.ps1"
 )
 
-REM --- 5. unattended 24x7 mode -------------------------------------------------
+REM --- 5. Google Sheets --------------------------------------------------------
 echo.
-echo   [5/5] 24x7 watchdog and power settings
+echo   [5/6] Google Sheets master tracker
+if exist "%APPDATA%\JobFinder\JobFinder.env.cmd" (
+    echo         Existing Google/runtime config found - keeping it.
+) else (
+    echo         JobFinder can use Google Sheets as the master queue and remote
+    echo         intervention channel.
+    set /p "SETUPGOOGLE=        Connect Google Sheets now? [Y/n]: "
+    if /I not "!SETUPGOOGLE!"=="n" (
+        call "%DEST%\scripts\configure-google-sheets.bat"
+        if errorlevel 1 (
+            echo         [!] Google Sheets was not configured. You can run:
+            echo             %DEST%\scripts\configure-google-sheets.bat
+            echo             at any time later.
+        )
+    ) else (
+        echo         Skipped. Run configure-google-sheets.bat later.
+    )
+)
+
+REM --- 6. unattended 24x7 mode -------------------------------------------------
+echo.
+echo   [6/6] 24x7 watchdog and power settings
 powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\configure-power-24x7.ps1" >nul 2>nul
 powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\install-24x7.ps1"
 if errorlevel 1 (
