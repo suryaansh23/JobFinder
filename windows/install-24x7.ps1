@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\JobFinder'
-$Watchdog = Join-Path $InstallDir 'windows\JobFinder-Watchdog.ps1'
+$Watchdog = Join-Path $InstallDir 'scripts\JobFinder-Watchdog.ps1'
 $TaskName = 'JobFinder 24x7 Watchdog'
 
 if (-not (Test-Path $Watchdog)) {
