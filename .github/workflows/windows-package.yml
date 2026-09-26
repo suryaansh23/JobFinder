@@ -1,0 +1,33 @@
+name: Windows Production Package
+
+on:
+  push:
+    branches:
+      - suryansh-phase3-windows-production
+  workflow_dispatch:
+
+jobs:
+  windows-package:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Windows desktop package
+        run: node desktop/build.js win
+      - name: Verify Windows desktop package
+        run: node desktop/verify.js
+      - name: Upload Windows installer bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: JobFinder-Windows
+          path: desktop/dist/JobFinder-Windows.zip
+          if-no-files-found: error
+          retention-days: 7
