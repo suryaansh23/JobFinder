@@ -1,4 +1,4 @@
-// Gmail connection + sync.
+// Google connection + Gmail sync. Gmail access is read-only; the configured tracker Sheet is read/write.
 //
 //   GET  ?profile_id=…                     → status + captured messages
 //   POST { action: 'save-client', client_id, client_secret }
