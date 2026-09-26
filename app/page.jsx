@@ -913,7 +913,7 @@ function InterventionPanel({ profileId, flash }) {
   const [busy, setBusy] = useState('');
 
   const load = useCallback(async () => {
-    const r = await fetch(\`/api/interventions?profile_id=\${encodeURIComponent(profileId)}&state=open\`)
+    const r = await fetch(`/api/interventions?profile_id=${encodeURIComponent(profileId)}&state=open`)
       .then((x) => x.json()).catch(() => ({}));
     setItems(r.interventions || []);
   }, [profileId]);
@@ -935,7 +935,7 @@ function InterventionPanel({ profileId, flash }) {
       if (r.error) throw new Error(r.error);
       flash?.('Blocked application opened on the home Chrome session.');
     } catch (e) {
-      flash?.(\`Could not open application: \${e.message}\`);
+      flash?.(`Could not open application: ${e.message}`);
     } finally {
       setBusy('');
     }
@@ -970,7 +970,7 @@ function InterventionPanel({ profileId, flash }) {
             : 'Resolved and safely requeued.'
       );
     } catch (e) {
-      flash?.(\`Could not resolve item: \${e.message}\`);
+      flash?.(`Could not resolve item: ${e.message}`);
     } finally {
       setBusy('');
     }
@@ -1005,7 +1005,7 @@ function InterventionPanel({ profileId, flash }) {
               </div>
               <div style={{ fontWeight: 700, marginTop: 8 }}>
                 {item.job_title || 'Application action required'}
-                {item.job_company ? \` @ \${item.job_company}\` : ''}
+                {item.job_company ? ` @ ${item.job_company}` : ''}
               </div>
               <div style={{ marginTop: 8, lineHeight: 1.5 }}>{item.prompt}</div>
               <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
