@@ -22,6 +22,7 @@ export const PATCH = withErrorHandling(async (req) => {
       answer: body.answer,
       resolution: body.resolution,
       requeue: body.requeue !== false,
+      outcome: body.outcome || null,
     });
     return Response.json({ ok: true, intervention: item });
   } catch (e) {
