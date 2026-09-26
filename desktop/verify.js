@@ -172,9 +172,13 @@ function verifyWin() {
   const inst = path.join(OUT, 'win/Install JobFinder.bat');
   const uninst = path.join(OUT, 'win/Uninstall JobFinder.bat');
   const ps1 = path.join(OUT, 'win/shortcuts.ps1');
+  const guard = path.join(OUT, 'win/register-24x7.ps1');
+  const unguard = path.join(OUT, 'win/unregister-24x7.ps1');
   exists(inst, 'installer included');
   exists(uninst, 'uninstaller included');
   exists(ps1, 'shortcut script included');
+  exists(guard, '24x7 guard registration included');
+  exists(unguard, '24x7 guard removal included');
 
   for (const [f, label] of [[inst, 'installer'], [uninst, 'uninstaller'], [ps1, 'shortcut script']]) {
     if (!fs.existsSync(f)) continue;
@@ -196,12 +200,23 @@ function verifyWin() {
     else bad('installer closes a running copy before copying', 'locked files would half-copy');
     if (!/powershell[^\n]*\$s\.TargetPath/.test(text)) ok('no inline PowerShell quoting in the .bat');
     else bad('no inline PowerShell quoting in the .bat', 'nested quotes here are what broke the first attempt');
+    if (/register-24x7\.ps1/i.test(text)) ok('installer enables the 24x7 guard');
+    else bad('installer enables the 24x7 guard');
   }
 
   if (fs.existsSync(ps1)) {
     const text = fs.readFileSync(ps1, 'utf8');
     if (/Test-Path \$target/.test(text)) ok('shortcut script checks the target exists first');
     else bad('shortcut script checks the target exists first', 'it would make a shortcut to nothing');
+  }
+  if (fs.existsSync(guard)) {
+    const text = fs.readFileSync(guard, 'utf8');
+    if (/New-ScheduledTaskTrigger -AtLogOn/.test(text)) ok('24x7 guard starts at logon');
+    else bad('24x7 guard starts at logon');
+    if (/RepetitionInterval .*Minutes 1/.test(text)) ok('24x7 guard checks for a dead app every minute');
+    else bad('24x7 guard checks for a dead app every minute');
+    if (/MultipleInstances IgnoreNew/.test(text)) ok('24x7 guard will not stack duplicate app instances');
+    else bad('24x7 guard will not stack duplicate app instances');
   }
 
   const zip = path.join(OUT, 'JobFinder-Windows.zip');
