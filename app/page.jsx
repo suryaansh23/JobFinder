@@ -2753,6 +2753,257 @@ function ProfileEditor({ profile, onChange, onSave, onDelete }) {
 //   • Questions the run could not answer are shown FIRST and block nothing else. The
 //     run never guesses at a fact about you; it stops and asks, and one answer
 //     unblocks every job waiting on the same question.
+
+function OrchestratorPanel({ profileId, flash }) {
+  const [cfg, setCfg] = useState(null);
+  const [sched, setSched] = useState(null);
+  const [status, setStatus] = useState(null);
+  const [sheetInput, setSheetInput] = useState('');
+  const [sheetTab, setSheetTab] = useState('Automation Queue');
+  const [armed, setArmed] = useState(false);
+  const [limit, setLimit] = useState(10);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const load = useCallback(async () => {
+    const [config, schedule, state] = await Promise.all([
+      fetch('/api/orchestrator-config').then((x) => x.json()).catch(() => null),
+      fetch('/api/orchestrator-schedule?profile_id=' + encodeURIComponent(profileId)).then((x) => x.json()).catch(() => null),
+      fetch('/api/orchestrator?profile_id=' + encodeURIComponent(profileId)).then((x) => x.json()).catch(() => null),
+    ]);
+    if (config && !config.error) {
+      setCfg(config);
+      if (!sheetInput && config.tracker?.spreadsheetId) setSheetInput(config.tracker.spreadsheetId);
+      if (config.tracker?.tab) setSheetTab(config.tracker.tab);
+    }
+    if (schedule && !schedule.error) setSched(schedule);
+    if (state && !state.error) setStatus(state);
+  }, [profileId, sheetInput]);
+
+  useEffect(() => { load(); }, [profileId]);
+  useEffect(() => {
+    if (!sched?.enabled) return undefined;
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [sched?.enabled, load]);
+
+  async function saveTracker() {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/orchestrator-config', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ spreadsheet_url: sheetInput, tab: sheetTab }),
+      }).then((x) => x.json());
+      if (r.error) return flash?.('Tracker setup failed: ' + r.error);
+      setCfg(r);
+      if (r.tracker?.spreadsheetId) setSheetInput(r.tracker.spreadsheetId);
+      flash?.(r.validated ? 'Tracker connected and validated.' : (r.validationError || 'Tracker saved.'));
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function validateTracker() {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/orchestrator-config', { method: 'POST' }).then((x) => x.json());
+      flash?.(r.error ? ('Validation failed: ' + r.error) : 'Tracker connection is healthy.');
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function connectGoogle() {
+    const r = await fetch('/api/gmail', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'auth-url', profile_id: profileId }),
+    }).then((x) => x.json());
+    if (r.url) window.open(r.url, '_blank');
+    else flash?.(r.error || 'Google OAuth client is not configured yet. Set it in Replies first.');
+  }
+
+  async function runQueue() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const r = await fetch('/api/orchestrator', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, armed, limit: Number(limit) || 10 }),
+      }).then((x) => x.json());
+      setResult(r);
+      if (r.error) flash?.('Queue run failed: ' + r.error);
+      else flash?.(armed
+        ? ('Queue run finished: ' + (r.applied || 0) + ' confirmed application(s).')
+        : ('Queue dry run finished: ' + (r.selected || 0) + ' row(s) checked.'));
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveSchedule(patch) {
+    const r = await fetch('/api/orchestrator-schedule', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ profile_id: profileId, ...sched, ...patch }),
+    }).then((x) => x.json());
+    if (r.error) flash?.(r.error);
+    else {
+      setSched(r.schedule);
+      flash?.(r.schedule?.enabled ? '24/7 Sheet scheduler saved.' : '24/7 Sheet scheduler stopped.');
+    }
+    await load();
+  }
+
+  const tracker = cfg?.tracker || {};
+  const google = cfg?.google || {};
+  const stats = status?.stats || {};
+
+  return (
+    <>
+      <div className="card" style={{ borderColor: '#58a6ff', background: '#58a6ff0d' }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 420px' }}>
+            <div className="label" style={{ color: '#58a6ff' }}>📋 Master 24/7 automation</div>
+            <div className="muted">
+              The Google Sheet is the source of truth. Newest queued rows run first. LinkedIn/Naukri
+              are handled here; company ATS rows move to ATS_QUEUED for the next engine.
+            </div>
+            <div className="row" style={{ gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
+              <span className="tag" style={{ color: tracker.configured ? '#3fb950' : '#d29922' }}>
+                Sheet {tracker.configured ? 'configured' : 'not configured'}
+              </span>
+              <span className="tag" style={{ color: google.connected ? '#3fb950' : '#d29922' }}>
+                Google {google.connected ? 'connected' : 'not connected'}
+              </span>
+              {sched?.enabled && (
+                <span className="tag" style={{ color: sched.armed ? '#f85149' : '#3fb950' }}>
+                  Scheduler {sched.armed ? 'LIVE' : 'DRY'}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={connectGoogle}>{google.connected ? 'Reconnect Google' : 'Connect Google'}</button>
+            {tracker.configured && <button onClick={validateTracker} disabled={busy}>Test tracker</button>}
+          </div>
+        </div>
+
+        <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <input
+            value={sheetInput}
+            onChange={(e) => setSheetInput(e.target.value)}
+            placeholder="Paste Google Sheet URL or spreadsheet ID"
+            style={{ flex: '1 1 420px', minWidth: 260 }}
+          />
+          <input
+            value={sheetTab}
+            onChange={(e) => setSheetTab(e.target.value)}
+            placeholder="Automation Queue"
+            style={{ width: 180 }}
+          />
+          <button className="primary" onClick={saveTracker} disabled={busy || !sheetInput.trim()}>
+            Save + validate
+          </button>
+        </div>
+
+        {Object.keys(stats).length > 0 && (
+          <div className="muted" style={{ marginTop: 10 }}>
+            Queue: {Object.entries(stats).map(([k, v]) => k + ': ' + v).join(' · ')}
+          </div>
+        )}
+
+        <div className="row" style={{ gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="muted">rows
+            <input type="number" min="1" max="25" value={limit}
+              onChange={(e) => setLimit(e.target.value)} style={{ width: 58, marginLeft: 5 }} />
+          </label>
+          <label className="row" style={{ gap: 6, alignItems: 'center', padding: '6px 10px', borderRadius: 8,
+            border: '1px solid ' + (armed ? '#f85149' : 'var(--border)') }}>
+            <input type="checkbox" checked={armed} onChange={(e) => setArmed(e.target.checked)} />
+            <span style={{ color: armed ? '#f85149' : 'inherit', fontWeight: 600 }}>Send for real</span>
+          </label>
+          <button className="primary" disabled={busy || !tracker.configured || !google.connected} onClick={runQueue}>
+            {busy ? 'Working…' : armed ? '⚠ Run LIFO queue live' : '🧪 Dry-run LIFO queue'}
+          </button>
+        </div>
+
+        {result && !result.error && (
+          <div className="muted" style={{ marginTop: 8 }}>
+            Selected {result.selected || 0} · confirmed {result.applied || 0} ·
+            unconfirmed {result.unconfirmed || 0} · action required {result.actionRequired || 0} ·
+            ATS queued {result.unsupported || 0}
+          </div>
+        )}
+      </div>
+
+      {sched && (
+        <div className="card" style={sched.enabled
+          ? { borderColor: sched.armed ? '#f85149' : '#3fb950', background: sched.armed ? '#f8514911' : '#3fb95011' }
+          : undefined}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div className="label">🖥️ 24/7 Sheet scheduler</div>
+              <div className="muted">
+                {sched.enabled
+                  ? ('On · ' + (sched.armed ? 'LIVE submissions' : 'dry runs') + (sched.nextRunAt ? ' · next ' + new Date(sched.nextRunAt).toLocaleTimeString() : ''))
+                  : 'Off'}
+                {sched.running ? ' · run in progress' : ''}
+              </div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                Confirmed today: {sched.sentToday || 0} / {sched.dailyCap || 30}.
+                Enabling this disables the old board-driven schedule so both cannot compete.
+              </div>
+            </div>
+            <div className="row" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label className="muted">every
+                <select value={sched.everyMinutes || 60}
+                  onChange={(e) => setSched({ ...sched, everyMinutes: Number(e.target.value) })}
+                  style={{ marginLeft: 5 }}>
+                  {[15, 20, 30, 60, 120, 240, 480].map((m) => (
+                    <option key={m} value={m}>{m < 60 ? m + ' min' : (m / 60) + ' hr'}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="muted">rows
+                <input type="number" min="1" max="25" value={sched.limit || 10}
+                  onChange={(e) => setSched({ ...sched, limit: Number(e.target.value) })}
+                  style={{ width: 58, marginLeft: 5 }} />
+              </label>
+              <label className="muted">cap/day
+                <input type="number" min="1" max="200" value={sched.dailyCap || 30}
+                  onChange={(e) => setSched({ ...sched, dailyCap: Number(e.target.value) })}
+                  style={{ width: 62, marginLeft: 5 }} />
+              </label>
+              <label className="row" style={{ gap: 5, alignItems: 'center' }}>
+                <input type="checkbox" checked={!!sched.armed}
+                  onChange={(e) => setSched({ ...sched, armed: e.target.checked })} />
+                <span style={{ color: sched.armed ? '#f85149' : 'inherit', fontWeight: 600 }}>Live</span>
+              </label>
+              {sched.enabled
+                ? <button className="danger" onClick={() => saveSchedule({ enabled: false })}>Stop</button>
+                : <button className="primary" disabled={!tracker.configured || !google.connected}
+                    onClick={() => saveSchedule({ enabled: true })}>Start</button>}
+              {sched.enabled && <button onClick={() => saveSchedule({ enabled: true })}>Apply changes</button>}
+            </div>
+          </div>
+          {sched.enabled && sched.armed && (
+            <div className="muted" style={{ marginTop: 8, color: '#f85149' }}>
+              LIVE mode persists across app restarts and submits from the Sheet without asking each time.
+              The daily cap and confirmation checks remain enforced.
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 function AutoApplyPanel({ profileId, flash }) {
   const [questions, setQuestions] = useState([]);
   const [eligible, setEligible] = useState(0);
@@ -2823,6 +3074,7 @@ function AutoApplyPanel({ profileId, flash }) {
 
   return (
     <div>
+      <OrchestratorPanel profileId={profileId} flash={flash} />
       <div className="card">
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
