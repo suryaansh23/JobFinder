@@ -31,6 +31,8 @@ let win = null;
 let server = null;
 let serverPort = 0;
 let shuttingDown = false;
+let serverRestartTimer = null;
+let serverRestartCount = 0;
 
 /** The Node runtime that runs the server. Shipped beside the app so nothing is assumed. */
 function nodeBinary() {
@@ -124,6 +126,10 @@ function escapeHtml(s) {
   ));
 }
 
+function dashboardUrl() {
+  return `http://127.0.0.1:${serverPort}/?shell=desktop`;
+}
+
 function startServer(port) {
   const env = {
     ...process.env,
@@ -147,9 +153,27 @@ function startServer(port) {
   child.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`));
   child.on('exit', (code) => {
     if (shuttingDown) return;
-    dialog.showErrorBox('JobFinder stopped',
-      `The application server exited unexpectedly (code ${code}). Reopen JobFinder to try again.`);
-    app.quit();
+    server = null;
+    serverRestartCount += 1;
+    const delay = Math.min(30000, 3000 * serverRestartCount);
+    splash(
+      'Recovering JobFinder',
+      `The background service stopped unexpectedly (code ${code}). Restarting automatically…`
+    );
+    if (serverRestartTimer) clearTimeout(serverRestartTimer);
+    serverRestartTimer = setTimeout(async () => {
+      if (shuttingDown) return;
+      try {
+        server = startServer(port);
+        const ok = await waitForServer(port, 45000);
+        if (!ok) throw new Error('server did not become healthy');
+        serverRestartCount = 0;
+        if (win && !win.isDestroyed()) await win.loadURL(dashboardUrl());
+      } catch (e) {
+        console.error('[desktop] server recovery failed:', e?.message || e);
+        try { if (server) server.kill(); } catch {}
+      }
+    }, delay);
   });
   return child;
 }
@@ -193,7 +217,8 @@ async function boot() {
 
   // ?shell=desktop tells the page it is inside the app window rather than a browser
   // tab, so it can reserve the strip macOS draws its window buttons over.
-  await win.loadURL(`http://127.0.0.1:${serverPort}/?shell=desktop`);
+  serverRestartCount = 0;
+  await win.loadURL(dashboardUrl());
 
   if (runtime.note) {
     dialog.showMessageBox(win, {
@@ -251,6 +276,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('before-quit', () => {
     shuttingDown = true;
+    if (serverRestartTimer) clearTimeout(serverRestartTimer);
     if (server) { try { server.kill(); } catch { /* already gone */ } }
   });
 }
