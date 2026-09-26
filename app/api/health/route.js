@@ -1,4 +1,4 @@
-import { backendName, get } from '../../../../lib/db.js';
+import { backendName, get } from '../../../lib/db.js';
 
 export const dynamic = 'force-dynamic';
 
