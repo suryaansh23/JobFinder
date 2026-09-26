@@ -34,6 +34,7 @@ export default function Dashboard() {
   // question after building it was "where is it?".
   const [gmail, setGmail] = useState(null);
   const [gmailPending, setGmailPending] = useState(0);
+  const [actionPending, setActionPending] = useState(0);
 
   const loadGmail = useCallback(async () => {
     if (!activeProfile) return;
@@ -42,6 +43,19 @@ export default function Dashboard() {
     if (r?.ok) { setGmail(r.status); setGmailPending((r.emails || []).length); }
   }, [activeProfile]);
   useEffect(() => { loadGmail(); }, [loadGmail]);
+
+  const loadActionPending = useCallback(async () => {
+    if (!activeProfile) { setActionPending(0); return; }
+    const r = await fetch(`/api/interventions?profile_id=${encodeURIComponent(activeProfile.id)}&state=open&limit=500`)
+      .then((x) => x.json()).catch(() => null);
+    setActionPending((r?.interventions || []).length);
+  }, [activeProfile]);
+  useEffect(() => {
+    loadActionPending();
+    const t = setInterval(loadActionPending, 30000);
+    return () => clearInterval(t);
+  }, [loadActionPending]);
+
   const [toast, setToast] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [filter, setFilter] = useState({ status: '', connector: '', q: '' });
@@ -455,6 +469,14 @@ export default function Dashboard() {
                 <div className={`tab ${tab === 'sources' ? 'active' : ''}`} onClick={() => setTab('sources')}>Sources</div>
                 <div className={`tab ${tab === 'answers' ? 'active' : ''}`} onClick={() => setTab('answers')}>Answer bank</div>
                 <div className={`tab ${tab === 'autoapply' ? 'active' : ''}`} onClick={() => setTab('autoapply')}>🤖 Auto-apply</div>
+                <div className={`tab ${tab === 'action' ? 'active' : ''}`} onClick={() => setTab('action')}>
+                  ⚠ Action Required
+                  {actionPending > 0 && (
+                    <span className="tag" style={{ background: '#f8514933', color: '#ff7b72', marginLeft: 6 }}>
+                      {actionPending}
+                    </span>
+                  )}
+                </div>
                 <div className={`tab ${tab === 'prep' ? 'active' : ''}`} onClick={() => setTab('prep')}>🎓 Interview Prep</div>
                 <div className={`tab ${tab === 'inbox' ? 'active' : ''}`} onClick={() => setTab('inbox')}>
                   📧 Replies
@@ -857,6 +879,7 @@ export default function Dashboard() {
 
               {tab === 'answers' && <AnswerBank profileId={activeProfile.id} />}
               {tab === 'autoapply' && <AutoApplyPanel profileId={activeProfile.id} flash={flash} />}
+              {tab === 'action' && <InterventionPanel profileId={activeProfile.id} flash={flash} onUpdated={loadActionPending} />}
 
               {tab === 'prep' && (
                 <>
@@ -904,6 +927,177 @@ export default function Dashboard() {
 // The conversion rates are the point: with a fixed runway you need to know whether
 // your problem is volume (apply more) or quality (fix the CV). Those are completely
 // different weeks of work, and without numbers people default to "apply harder".
+
+function InterventionPanel({ profileId, flash, onUpdated }) {
+  const [items, setItems] = useState([]);
+  const [drafts, setDrafts] = useState({});
+  const [busy, setBusy] = useState('');
+
+  const load = useCallback(async () => {
+    const r = await fetch(`/api/interventions?profile_id=${encodeURIComponent(profileId)}&state=open`)
+      .then((x) => x.json()).catch(() => ({}));
+    setItems(r.interventions || []);
+    onUpdated?.();
+  }, [profileId, onUpdated]);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  async function openOnHome(item) {
+    setBusy(item.id + ':open');
+    try {
+      const r = await fetch('/api/interventions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ profile_id: profileId, id: item.id }),
+      }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      flash?.('Blocked application opened on the home Chrome session.');
+    } catch (e) {
+      flash?.(`Could not open application: ${e.message}`);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function resolve(item, outcome) {
+    const answer = String(drafts[item.id] || '').trim();
+    if (item.kind === 'question' && !answer) {
+      flash?.('Enter the answer before requeueing this question.');
+      return;
+    }
+    setBusy(item.id + ':' + outcome);
+    try {
+      const r = await fetch('/api/interventions', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          profile_id: profileId,
+          id: item.id,
+          answer: item.kind === 'question' ? answer : undefined,
+          resolution: item.kind === 'question' ? 'Answered from Action Required panel' : outcome,
+          outcome,
+          requeue: outcome === 'retry',
+        }),
+      }).then((x) => x.json());
+      if (r.error) throw new Error(r.error);
+      setDrafts((d) => ({ ...d, [item.id]: '' }));
+      await load();
+      flash?.(
+        outcome === 'applied' ? 'Marked as confirmed applied.'
+          : outcome === 'skipped' ? 'Skipped.'
+            : 'Resolved and safely requeued.'
+      );
+    } catch (e) {
+      flash?.(`Could not resolve item: ${e.message}`);
+    } finally {
+      setBusy('');
+    }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ borderColor: '#d29924', background: '#d299240d' }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div className="label" style={{ color: '#e3b341' }}>⚠ Human intervention queue</div>
+            <div className="muted" style={{ marginTop: 6 }}>
+              JobFinder stops here instead of guessing. Resolve the blocker, then requeue only when it is safe.
+            </div>
+          </div>
+          <button onClick={load}>↻ Refresh</button>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="card">
+          <strong>No action required.</strong>
+          <div className="muted" style={{ marginTop: 6 }}>CAPTCHAs, OTPs, unknown questions and uncertain submissions will appear here.</div>
+        </div>
+      ) : items.map((item) => (
+        <div className="card" key={item.id} style={{ borderColor: item.kind === 'reconcile_submission' ? '#f85149' : '#d29924' }}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <div className="row" style={{ gap: 8 }}>
+                <span className="tag">{item.kind}</span>
+                {item.job_connector && <span className="tag">{item.job_connector}</span>}
+              </div>
+              <div style={{ fontWeight: 700, marginTop: 8 }}>
+                {item.job_title || 'Application action required'}
+                {item.job_company ? ` @ ${item.job_company}` : ''}
+              </div>
+              <div style={{ marginTop: 8, lineHeight: 1.5 }}>{item.prompt}</div>
+              <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                {new Date(item.created_at).toLocaleString()}
+              </div>
+            </div>
+            {item.job_url && (
+              <button onClick={() => openOnHome(item)} disabled={busy === item.id + ':open'}>
+                {busy === item.id + ':open' ? 'Opening…' : 'Open on home Chrome'}
+              </button>
+            )}
+          </div>
+
+          {item.kind === 'question' && (
+            <div style={{ marginTop: 14 }}>
+              <div className="label">Your answer</div>
+              {Array.isArray(item.options) && item.options.length ? (
+                <select
+                  value={drafts[item.id] || ''}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                >
+                  <option value="">Select…</option>
+                  {item.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  value={drafts[item.id] || ''}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [item.id]: e.target.value }))}
+                  placeholder="Enter the factual answer"
+                  style={{ width: '100%', marginTop: 6 }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="row" style={{ marginTop: 14, flexWrap: 'wrap' }}>
+            <button
+              className="primary"
+              onClick={() => resolve(item, 'retry')}
+              disabled={busy.startsWith(item.id + ':')}
+            >
+              {item.kind === 'question' ? 'Save answer + requeue' : 'Fixed, retry safely'}
+            </button>
+            <button
+              onClick={() => resolve(item, 'applied')}
+              disabled={busy.startsWith(item.id + ':')}
+              style={{ background: '#23863622', borderColor: '#238636', color: '#3fb950' }}
+              title="Use only after you have verified the employer/ATS actually received the application"
+            >
+              Confirmed Applied
+            </button>
+            <button
+              onClick={() => resolve(item, 'skipped')}
+              disabled={busy.startsWith(item.id + ':')}
+            >
+              Skip
+            </button>
+          </div>
+
+          {item.kind === 'reconcile_submission' && (
+            <div className="muted" style={{ marginTop: 10, color: '#f85149' }}>
+              Do not retry until you have checked whether the previous submit actually reached the employer.
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TrackerPanel({ tracker, onJump }) {
   const [open, setOpen] = useState(true);
   const f = tracker.funnel;
