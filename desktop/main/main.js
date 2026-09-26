@@ -12,7 +12,7 @@
 // real Node, native modules (better-sqlite3) and its own lifecycle, and keeping it
 // separate means a crash there is recoverable instead of taking the window with it.
 
-const { app, BrowserWindow, shell, dialog, Menu } = require('electron');
+const { app, BrowserWindow, shell, dialog, Menu, powerSaveBlocker } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -33,6 +33,7 @@ let serverPort = 0;
 let shuttingDown = false;
 let serverRestartTimer = null;
 let serverRestartCount = 0;
+let powerBlockerId = null;
 
 /** The Node runtime that runs the server. Shipped beside the app so nothing is assumed. */
 function nodeBinary() {
@@ -267,6 +268,14 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    // This machine is intended to work unattended. Keep the system awake while
+    // allowing the display to turn off normally.
+    if (!powerSaveBlocker.isStarted(powerBlockerId)) {
+      powerBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+    }
+    if (process.platform === 'win32') {
+      try { app.setLoginItemSettings({ openAtLogin: true, path: process.execPath }); } catch {}
+    }
     buildMenu();
     boot();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) boot(); });
@@ -277,6 +286,9 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', () => {
     shuttingDown = true;
     if (serverRestartTimer) clearTimeout(serverRestartTimer);
+    if (powerBlockerId != null && powerSaveBlocker.isStarted(powerBlockerId)) {
+      try { powerSaveBlocker.stop(powerBlockerId); } catch {}
+    }
     if (server) { try { server.kill(); } catch { /* already gone */ } }
   });
 }
