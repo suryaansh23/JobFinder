@@ -3,16 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3737 -H 0.0.0.0",
+    "dev": "next dev -p 3737 -H 127.0.0.1",
     "build": "next build",
-    "start": "next start -p 3737 -H 0.0.0.0",
+    "start": "next start -p 3737 -H 127.0.0.1",
     "postinstall": "playwright install chromium firefox",
     "install-launcher": "node scripts/install-launcher.js",
     "build:windows": "node windows/build.js",
     "verify:windows": "node windows/verify.js",
     "make:icon": "node windows/make-icon.js",
     "build:desktop": "node desktop/build.js",
-    "verify:desktop": "node desktop/verify.js"
+    "verify:desktop": "node desktop/verify.js",
+    "windows:24x7": "powershell -NoProfile -ExecutionPolicy Bypass -File windows/install-24x7.ps1"
   },
   "dependencies": {
     "better-sqlite3": "11.3.0",
