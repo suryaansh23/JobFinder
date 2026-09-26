@@ -15,13 +15,14 @@ Supported business states:
 - `NOT_APPLIED`
 - `RUNNING`
 - `DRY_RUN_OK`
+- `ATS_QUEUED`
 - `APPLIED`
 - `ACTION_REQUIRED`
 - `FAILED`
 - `HOLD`
 - `SKIPPED`
 
-Rows are processed LIFO: newest `queued_at` first, then the lowest sheet position wins only when timestamps are identical.
+Rows are processed LIFO: newest `queued_at` first; when timestamps are identical, the bottom-most Sheet row is processed first.
 
 ## Google configuration
 
@@ -57,4 +58,4 @@ Live run:
 
 POST those bodies to `/api/orchestrator`.
 
-Phase 2 submits LinkedIn/Naukri on-site applications through the existing JobFinder engine. External ATS rows remain `NOT_APPLIED` and are tagged for the ATS engine rather than being guessed at.
+Phase 2 submits LinkedIn/Naukri on-site applications through the existing JobFinder engine. External ATS rows move to `ATS_QUEUED` and wait for the dedicated ATS engine rather than being guessed at.
