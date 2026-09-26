@@ -1,0 +1,104 @@
+name: Windows Release
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build Windows bundle
+        run: npm run build:windows
+      - name: Verify Windows bundle structure
+        run: npm run verify:windows
+      - name: Upload Windows bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: JobFinder-Windows
+          path: windows/dist/JobFinder-Windows.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-smoke:
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: JobFinder-Windows
+          path: artifact
+      - name: Extract and install test bundle
+        shell: powershell
+        run: |
+          $zip = Resolve-Path "artifact\JobFinder-Windows.zip"
+          $stage = Join-Path $env:RUNNER_TEMP "JobFinderStage"
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -Path $zip -DestinationPath $stage -Force
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path (Join-Path $stage "JobFinder\*") -Destination $dest -Recurse -Force
+          if (-not (Test-Path (Join-Path $dest "node\node.exe"))) { throw "node.exe missing" }
+          if (-not (Test-Path (Join-Path $dest "scripts\JobFinder-Watchdog.ps1"))) { throw "watchdog missing" }
+          & (Join-Path $dest "node\node.exe") --version
+
+      - name: Start 24x7 watchdog
+        shell: powershell
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          & (Join-Path $dest "scripts\install-24x7.ps1")
+
+      - name: Verify server health and loopback binding
+        shell: powershell
+        run: |
+          $healthy = $false
+          for ($i = 0; $i -lt 45; $i++) {
+            try {
+              $r = Invoke-RestMethod -Uri "http://127.0.0.1:3737/api/health" -TimeoutSec 3
+              if ($r.ok -eq $true) { $healthy = $true; break }
+            } catch {}
+            Start-Sleep -Seconds 2
+          }
+          if (-not $healthy) {
+            $log = Join-Path $env:APPDATA "JobFinder\watchdog\watchdog.log"
+            if (Test-Path $log) { Get-Content $log -Tail 100 }
+            throw "JobFinder health endpoint did not become ready"
+          }
+
+          $listeners = @(Get-NetTCPConnection -State Listen -LocalPort 3737 -ErrorAction Stop)
+          if (-not $listeners.Count) { throw "No listener found on port 3737" }
+          $bad = @($listeners | Where-Object { $_.LocalAddress -notin @("127.0.0.1", "::1") })
+          if ($bad.Count) {
+            $bad | Format-Table -AutoSize
+            throw "JobFinder is listening beyond loopback"
+          }
+
+          $r = Invoke-RestMethod -Uri "http://127.0.0.1:3737/api/health" -TimeoutSec 5
+          if ($r.db -ne "ok") { throw "Database health failed" }
+          Write-Host "Health OK. Backend=$($r.backend) PID=$($r.pid)"
+
+      - name: Cleanup watchdog
+        if: always()
+        shell: powershell
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          $uninstall = Join-Path $dest "scripts\uninstall-24x7.ps1"
+          if (Test-Path $uninstall) { & $uninstall }
+          Get-CimInstance Win32_Process |
+            Where-Object { $_.Name -ieq "node.exe" -and $_.CommandLine -like "*app\server.js*" } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
