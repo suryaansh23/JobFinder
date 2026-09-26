@@ -94,3 +94,20 @@ Queue + Interventions tabs, and stores the refresh token in:
 
 That file stays outside the install folder and is preserved across upgrades.
 
+24x7 CONTROL
+------------
+After you have created a JobFinder profile, uploaded at least one CV, connected the
+Google Sheet, and signed into the job boards you use, run:
+
+    scripts\24x7-control.bat
+
+or use the "JobFinder 24x7 Control" Desktop shortcut.
+
+The controller can:
+  1. show status
+  2. enable SAFE dry-run mode and start the first discovery scan immediately
+  3. arm LIVE unattended applications only after you type LIVE
+  4. pause the orchestrator
+
+Recommended first activation: SAFE dry-run. Review the Sheet results before arming LIVE.
+

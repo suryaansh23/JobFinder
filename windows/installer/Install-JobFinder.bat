@@ -66,8 +66,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "  $s.WorkingDirectory='%DEST%';" ^
   "  $s.IconLocation='%DEST%\app\public\favicon.ico,0';" ^
   "  $s.Description='JobFinder - local job application assistant';" ^
-  "  $s.Save() }" >nul 2>nul
-if exist "%DESKTOP%\JobFinder.lnk" (echo         Desktop icon created.) else (echo         [!] Desktop shortcut could not be created.)
+  "  $s.Save();" ^
+  "  $c=$w.CreateShortcut((Join-Path $dir 'JobFinder 24x7 Control.lnk'));" ^
+  "  $c.TargetPath='%DEST%\scripts\24x7-control.bat';" ^
+  "  $c.WorkingDirectory='%DEST%';" ^
+  "  $c.IconLocation='%DEST%\app\public\favicon.ico,0';" ^
+  "  $c.Description='JobFinder - control unattended scanning and applications';" ^
+  "  $c.Save() }" >nul 2>nul
+if exist "%DESKTOP%\JobFinder.lnk" (echo         Desktop icons created.) else (echo         [!] Desktop shortcut could not be created.)
 
 REM --- 3. Ollama --------------------------------------------------------------
 echo.
