@@ -494,6 +494,8 @@ async function buildWin() {
   fs.writeFileSync(path.join(outDir, 'Install JobFinder.bat'), crlf(WIN_INSTALLER), 'utf8');
   fs.writeFileSync(path.join(outDir, 'Uninstall JobFinder.bat'), crlf(WIN_UNINSTALLER), 'utf8');
   fs.writeFileSync(path.join(outDir, 'shortcuts.ps1'), crlf(WIN_SHORTCUTS), 'utf8');
+  fs.copyFileSync(path.join(HERE, 'windows/register-24x7.ps1'), path.join(outDir, 'register-24x7.ps1'));
+  fs.copyFileSync(path.join(HERE, 'windows/unregister-24x7.ps1'), path.join(outDir, 'unregister-24x7.ps1'));
   fs.writeFileSync(path.join(outDir, 'START HERE.txt'), crlf(WIN_README));
 
   step('Zipping the Windows package');
@@ -516,8 +518,9 @@ INSTALLING
      code-signed. Click "More info" then "Run anyway". It happens once.
 
 That copies JobFinder into your user folder, puts it on the Start Menu and the desktop,
-and opens it. No administrator password is needed, and you can delete the unzipped
-folder afterwards.
+enables the 24/7 Windows guard, and opens it. The app also keeps the computer awake while
+it is working; the display can still turn off normally. No administrator password is
+needed, and you can delete the unzipped folder afterwards.
 
 Prefer not to install? Open the JobFinder folder and run JobFinder.exe directly. It
 works exactly the same.
@@ -585,6 +588,13 @@ if errorlevel 8 (
 echo   Creating shortcuts...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0shortcuts.ps1" >nul 2>&1
 
+echo   Enabling 24/7 guard...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0register-24x7.ps1" >nul 2>&1
+if errorlevel 1 (
+  echo   WARNING: The 24/7 guard could not be registered.
+  echo   JobFinder will still run, but Windows will not relaunch it after a full app crash.
+)
+
 echo.
 echo   Done. JobFinder is on your desktop and in the Start Menu.
 echo.
@@ -644,6 +654,7 @@ echo.
 choice /C YN /M "   Remove JobFinder"
 if errorlevel 2 goto :cancelled
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0unregister-24x7.ps1" >nul 2>&1
 taskkill /IM JobFinder.exe /F >nul 2>&1
 timeout /t 2 >nul
 if exist "%DEST%" rmdir /S /Q "%DEST%"
