@@ -270,7 +270,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     // This machine is intended to work unattended. Keep the system awake while
     // allowing the display to turn off normally.
-    if (!powerSaveBlocker.isStarted(powerBlockerId)) {
+    if (powerBlockerId == null) {
       powerBlockerId = powerSaveBlocker.start('prevent-app-suspension');
     }
     if (process.platform === 'win32') {
