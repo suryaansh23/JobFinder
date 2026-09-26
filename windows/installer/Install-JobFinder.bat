@@ -37,7 +37,7 @@ if not exist "%SRC%app\server.js" (
 )
 
 REM --- 1. copy the application ------------------------------------------------
-echo   [1/4] Copying files...
+echo   [1/5] Copying files...
 if exist "%DEST%" (
     echo         Existing install found - updating in place.
     echo         Your data in %%APPDATA%%\JobFinder is left untouched.
@@ -56,7 +56,7 @@ if %ERRORLEVEL% GEQ 8 (
 echo         Done.
 
 REM --- 2. shortcuts -----------------------------------------------------------
-echo   [2/4] Creating shortcuts...
+echo   [2/5] Creating shortcuts...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$w=New-Object -ComObject WScript.Shell;" ^
   "foreach ($dir in @('%DESKTOP%','%STARTMENU%')) {" ^
@@ -71,7 +71,7 @@ if exist "%DESKTOP%\JobFinder.lnk" (echo         Desktop icon created.) else (ec
 
 REM --- 3. Ollama --------------------------------------------------------------
 echo.
-echo   [3/4] Local AI engine ^(Ollama^)
+echo   [3/5] Local AI engine ^(Ollama^)
 set "OLLAMA_EXE="
 where ollama >nul 2>nul && set "OLLAMA_EXE=ollama"
 if not defined OLLAMA_EXE if exist "%LOCALAPPDATA%\Programs\Ollama\ollama.exe" set "OLLAMA_EXE=%LOCALAPPDATA%\Programs\Ollama\ollama.exe"
@@ -98,12 +98,24 @@ if defined OLLAMA_EXE (
 
 REM --- 4. models --------------------------------------------------------------
 echo.
-echo   [4/4] AI models
+echo   [4/5] AI models
 if not defined OLLAMA_EXE (
     echo         Ollama not available - skipping models.
     echo         Once you install it, run:  ollama pull qwen2.5:7b-instruct
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\post-install-models.ps1"
+)
+
+REM --- 5. unattended 24x7 mode -------------------------------------------------
+echo.
+echo   [5/5] 24x7 watchdog and power settings
+powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\configure-power-24x7.ps1" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%DEST%\scripts\install-24x7.ps1"
+if errorlevel 1 (
+    echo         [!] Could not register the 24x7 watchdog. JobFinder can still be
+    echo             started from the Desktop shortcut; rerun install-24x7.ps1 later.
+) else (
+    echo         24x7 watchdog enabled for this Windows user.
 )
 
 REM --- done -------------------------------------------------------------------
@@ -115,8 +127,12 @@ echo.
 echo     Desktop icon : JobFinder
 echo     Installed to : %DEST%
 echo     Your data    : %APPDATA%\JobFinder   ^(kept across updates^)
+echo     24x7 mode    : enabled at Windows logon
 echo.
-set /p "RUNNOW=  Start JobFinder now? [Y/n]: "
-if /I not "!RUNNOW!"=="n" start "" "%DEST%\scripts\launcher.bat"
+set /p "OPENNOW=  Open the JobFinder dashboard now? [Y/n]: "
+if /I not "!OPENNOW!"=="n" (
+    timeout /t 3 /nobreak >nul
+    start "" http://127.0.0.1:3737
+)
 
 endlocal
