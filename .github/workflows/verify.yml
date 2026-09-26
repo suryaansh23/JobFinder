@@ -20,6 +20,8 @@ jobs:
           node-version: "20"
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+      - name: Verify patched Next.js
+        run: node -e "const v=require('next/package.json').version;if(v!=='15.5.25'){throw new Error('Unexpected Next.js '+v)}"
       - name: Production build
         run: npm run build
