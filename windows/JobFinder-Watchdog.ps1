@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
 $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\JobFinder'
-$Exe = Join-Path $InstallDir 'JobFinder.exe'
+$ServerLauncher = Join-Path $InstallDir 'scripts\server-only.bat'
 $LogDir = Join-Path $env:APPDATA 'JobFinder\watchdog'
 $Log = Join-Path $LogDir 'watchdog.log'
 $HealthUrl = 'http://127.0.0.1:3737/api/health'
@@ -13,13 +13,23 @@ function Write-Log($Message) {
   Add-Content -Path $Log -Value $line
 }
 
+function Get-JobFinderServerProcess {
+  Get-CimInstance Win32_Process |
+    Where-Object {
+      $_.Name -ieq 'node.exe' -and
+      $_.CommandLine -like '*app\server.js*' -and
+      $_.CommandLine -like "*$InstallDir*"
+    }
+}
+
 function Start-JobFinder {
-  if (-not (Test-Path $Exe)) {
-    Write-Log "JobFinder.exe missing at $Exe"
+  if (-not (Test-Path $ServerLauncher)) {
+    Write-Log "Server launcher missing at $ServerLauncher"
     return
   }
-  Write-Log 'Starting JobFinder'
-  Start-Process -FilePath $Exe -WorkingDirectory $InstallDir
+  Write-Log 'Starting JobFinder server'
+  $args = @('/c', ('"' + $ServerLauncher + '"'))
+  Start-Process -FilePath 'cmd.exe' -ArgumentList $args -WindowStyle Hidden
 }
 
 while ($true) {
@@ -30,14 +40,17 @@ while ($true) {
   } catch {}
 
   if (-not $healthy) {
-    $proc = Get-Process -Name 'JobFinder' -ErrorAction SilentlyContinue
-    if ($proc) {
-      Write-Log 'Process exists but health check failed. Restarting.'
-      $proc | Stop-Process -Force
+    $procs = @(Get-JobFinderServerProcess)
+    if ($procs.Count -gt 0) {
+      Write-Log 'Server process exists but health check failed. Restarting.'
+      foreach ($p in $procs) {
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+      }
       Start-Sleep -Seconds 3
     } else {
-      Write-Log 'Process is not running.'
+      Write-Log 'Server process is not running.'
     }
+
     Start-JobFinder
     Start-Sleep -Seconds 25
   }
