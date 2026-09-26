@@ -213,8 +213,17 @@ async function main() {
   step('Copying installer assets');
   mkdirp(path.join(DIST, 'scripts'));
   cprf(path.join(HERE, 'installer', 'launcher.bat'), path.join(DIST, 'scripts', 'launcher.bat'));
+  cprf(path.join(HERE, 'installer', 'server-only.bat'), path.join(DIST, 'scripts', 'server-only.bat'));
   cprf(path.join(HERE, 'installer', 'post-install-models.ps1'), path.join(DIST, 'scripts', 'post-install-models.ps1'));
+  cprf(path.join(HERE, 'JobFinder-Watchdog.ps1'), path.join(DIST, 'scripts', 'JobFinder-Watchdog.ps1'));
+  cprf(path.join(HERE, 'install-24x7.ps1'), path.join(DIST, 'scripts', 'install-24x7.ps1'));
+  cprf(path.join(HERE, 'uninstall-24x7.ps1'), path.join(DIST, 'scripts', 'uninstall-24x7.ps1'));
+  cprf(path.join(HERE, 'configure-power-24x7.ps1'), path.join(DIST, 'scripts', 'configure-power-24x7.ps1'));
   cprf(path.join(HERE, 'installer', 'README.txt'), path.join(DIST, 'README.txt'));
+  fs.writeFileSync(
+    path.join(DIST, 'BUILD.txt'),
+    `commit=${process.env.GITHUB_SHA || 'local'}\nbuilt_at=${new Date().toISOString()}\nnode_runtime=${NODE_VERSION}\n`
+  );
 
   // 7. summary
   // ── Verify before declaring success ───────────────────────────────────────
