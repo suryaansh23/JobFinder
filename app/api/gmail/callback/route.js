@@ -35,7 +35,7 @@ export async function GET(req) {
     const status = await exchangeCode(code, `${origin}/api/gmail/callback`);
     return page(
       'Gmail connected',
-      `JobFinder can now read ${status.email || 'your mailbox'} — read-only, and only messages matching your job search. Revoke any time at myaccount.google.com/permissions.`,
+      `Google connected for ${status.email || 'your account'}. Gmail remains read-only; JobFinder can also read and update only the tracker Sheet you configure. Revoke any time at myaccount.google.com/permissions.`,
       true
     );
   } catch (e) {
