@@ -78,3 +78,19 @@ PRIVACY
 Everything runs on your machine. There is no account and no server. Your CV, answers,
 cookies and database never leave the computer. Full details in README.md and
 USER_MANUAL.md in the project repository.
+
+GOOGLE SHEETS MASTER TRACKER
+----------------------------
+JobFinder can use a Google Sheet as its master queue and remote intervention channel.
+
+Run:
+    scripts\configure-google-sheets.bat
+
+You need a Google OAuth "Desktop app" client ID and client secret once. The helper
+opens Google sign-in, captures the authorization locally, validates the Automation
+Queue + Interventions tabs, and stores the refresh token in:
+
+    %APPDATA%\JobFinder\JobFinder.env.cmd
+
+That file stays outside the install folder and is preserved across upgrades.
+
