@@ -24,6 +24,8 @@ export const PUT = withErrorHandling(async (req) => {
     everyMinutes: body.everyMinutes,
     limit: body.limit,
     dailyCap: body.dailyCap,
+    scan: body.scan,
+    scanEveryMinutes: body.scanEveryMinutes,
   });
   return Response.json({ ok: true, schedule: cfg });
 });
