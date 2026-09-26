@@ -97,6 +97,8 @@ for (const rel of [
   'scripts/google-sheets-setup.js',
   'scripts/configure-google-sheets.bat',
   'scripts/JobFinder.env.cmd.example',
+  'scripts/24x7-control.js',
+  'scripts/24x7-control.bat',
   'scripts/JobFinder-Watchdog.ps1',
   'scripts/install-24x7.ps1',
   'scripts/uninstall-24x7.ps1',
