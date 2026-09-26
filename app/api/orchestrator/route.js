@@ -1,11 +1,13 @@
 import { orchestratorStatus, runOrchestrator } from '../../../lib/orchestrator.js';
 import { get } from '../../../lib/db.js';
 import { readJson, requireFields, withErrorHandling, HttpError } from '../../../lib/http.js';
+import { ensureSchedulerStarted } from '../../../lib/schedulerBoot.js';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 900;
 
 export const GET = withErrorHandling(async (req) => {
+  ensureSchedulerStarted();
   const { searchParams } = new URL(req.url);
   const profileId = searchParams.get('profile_id');
   if (!profileId) throw new HttpError(400, 'profile_id required');
@@ -15,6 +17,7 @@ export const GET = withErrorHandling(async (req) => {
 });
 
 export const POST = withErrorHandling(async (req) => {
+  ensureSchedulerStarted();
   const body = await readJson(req);
   requireFields(body, ['profile_id']);
   const armed = body.armed === true;
