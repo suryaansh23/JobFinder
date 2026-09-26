@@ -34,6 +34,7 @@ export default function Dashboard() {
   // question after building it was "where is it?".
   const [gmail, setGmail] = useState(null);
   const [gmailPending, setGmailPending] = useState(0);
+  const [actionPending, setActionPending] = useState(0);
 
   const loadGmail = useCallback(async () => {
     if (!activeProfile) return;
@@ -42,6 +43,19 @@ export default function Dashboard() {
     if (r?.ok) { setGmail(r.status); setGmailPending((r.emails || []).length); }
   }, [activeProfile]);
   useEffect(() => { loadGmail(); }, [loadGmail]);
+
+  const loadActionPending = useCallback(async () => {
+    if (!activeProfile) { setActionPending(0); return; }
+    const r = await fetch(`/api/interventions?profile_id=${encodeURIComponent(activeProfile.id)}&state=open&limit=500`)
+      .then((x) => x.json()).catch(() => null);
+    setActionPending((r?.interventions || []).length);
+  }, [activeProfile]);
+  useEffect(() => {
+    loadActionPending();
+    const t = setInterval(loadActionPending, 30000);
+    return () => clearInterval(t);
+  }, [loadActionPending]);
+
   const [toast, setToast] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [filter, setFilter] = useState({ status: '', connector: '', q: '' });
@@ -455,7 +469,14 @@ export default function Dashboard() {
                 <div className={`tab ${tab === 'sources' ? 'active' : ''}`} onClick={() => setTab('sources')}>Sources</div>
                 <div className={`tab ${tab === 'answers' ? 'active' : ''}`} onClick={() => setTab('answers')}>Answer bank</div>
                 <div className={`tab ${tab === 'autoapply' ? 'active' : ''}`} onClick={() => setTab('autoapply')}>🤖 Auto-apply</div>
-                <div className={`tab ${tab === 'action' ? 'active' : ''}`} onClick={() => setTab('action')}>⚠ Action Required</div>
+                <div className={`tab ${tab === 'action' ? 'active' : ''}`} onClick={() => setTab('action')}>
+                  ⚠ Action Required
+                  {actionPending > 0 && (
+                    <span className="tag" style={{ background: '#f8514933', color: '#ff7b72', marginLeft: 6 }}>
+                      {actionPending}
+                    </span>
+                  )}
+                </div>
                 <div className={`tab ${tab === 'prep' ? 'active' : ''}`} onClick={() => setTab('prep')}>🎓 Interview Prep</div>
                 <div className={`tab ${tab === 'inbox' ? 'active' : ''}`} onClick={() => setTab('inbox')}>
                   📧 Replies
@@ -858,7 +879,7 @@ export default function Dashboard() {
 
               {tab === 'answers' && <AnswerBank profileId={activeProfile.id} />}
               {tab === 'autoapply' && <AutoApplyPanel profileId={activeProfile.id} flash={flash} />}
-              {tab === 'action' && <InterventionPanel profileId={activeProfile.id} flash={flash} />}
+              {tab === 'action' && <InterventionPanel profileId={activeProfile.id} flash={flash} onUpdated={loadActionPending} />}
 
               {tab === 'prep' && (
                 <>
@@ -907,7 +928,7 @@ export default function Dashboard() {
 // your problem is volume (apply more) or quality (fix the CV). Those are completely
 // different weeks of work, and without numbers people default to "apply harder".
 
-function InterventionPanel({ profileId, flash }) {
+function InterventionPanel({ profileId, flash, onUpdated }) {
   const [items, setItems] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState('');
@@ -916,7 +937,8 @@ function InterventionPanel({ profileId, flash }) {
     const r = await fetch(`/api/interventions?profile_id=${encodeURIComponent(profileId)}&state=open`)
       .then((x) => x.json()).catch(() => ({}));
     setItems(r.interventions || []);
-  }, [profileId]);
+    onUpdated?.();
+  }, [profileId, onUpdated]);
 
   useEffect(() => {
     load();
