@@ -90,7 +90,17 @@ for (const leak of ['data', '.env', '.env.local', '.git']) {
 ok.push('no data/, .env or .git in the bundle');
 
 // 5. Installer assets the .iss references.
-for (const rel of ['scripts/launcher.bat', 'scripts/post-install-models.ps1', 'Install-JobFinder.bat']) {
+for (const rel of [
+  'scripts/launcher.bat',
+  'scripts/server-only.bat',
+  'scripts/post-install-models.ps1',
+  'scripts/JobFinder-Watchdog.ps1',
+  'scripts/install-24x7.ps1',
+  'scripts/uninstall-24x7.ps1',
+  'scripts/configure-power-24x7.ps1',
+  'Install-JobFinder.bat',
+  'BUILD.txt',
+]) {
   if (fs.existsSync(path.join(DIST, rel))) ok.push(rel);
   else problems.push(`${rel} missing from the bundle root`);
 }
