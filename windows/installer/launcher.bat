@@ -24,6 +24,9 @@ if not exist "%JOBFINDER_DATA%\data" mkdir "%JOBFINDER_DATA%\data"
 if not exist "%JOBFINDER_DATA%\lib"  mkdir "%JOBFINDER_DATA%\lib"
 copy /Y "%INSTALL_DIR%\app\lib\toolbar.src.js" "%JOBFINDER_DATA%\lib\toolbar.src.js" >nul 2>nul
 
+REM Load user-specific runtime settings without putting secrets inside the install folder.
+if exist "%JOBFINDER_DATA%\JobFinder.env.cmd" call "%JOBFINDER_DATA%\JobFinder.env.cmd"
+
 REM ---------------------------------------------------------------------------
 REM Ollama - optional. JobFinder runs without it; only the AI features go quiet.
 REM ---------------------------------------------------------------------------
