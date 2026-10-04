@@ -2621,6 +2621,11 @@ function ProfileEditor({ profile, onChange, onSave, onDelete }) {
           <label className="label">
             Last working day at your current job
             {(() => {
+              if (filters.notice_period_mode === 'rolling_1_month') {
+                const today = new Date();
+                const target = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+                return <span style={{ color: '#3fb950' }}> · automatically kept at <strong>1 month from today</strong> ({target.toLocaleDateString()})</span>;
+              }
               const d = filters.last_working_day;
               if (!d) return <span className="muted"> · not set — notice period comes from your answer bank instead</span>;
               const days = Math.max(0, Math.round((new Date(`${d}T00:00:00`) - new Date(new Date().toDateString())) / 86400000));
@@ -2629,16 +2634,25 @@ function ProfileEditor({ profile, onChange, onSave, onDelete }) {
                 : <span style={{ color: '#3fb950' }}> · notice period answers as <strong>{days} day{days === 1 ? '' : 's'}</strong> today</span>;
             })()}
           </label>
+          <label className="row" style={{ gap: 8, alignItems: 'center' }}>
+            <input
+              type="checkbox"
+              checked={filters.notice_period_mode === 'rolling_1_month'}
+              onChange={(e) => setFilter('notice_period_mode', e.target.checked ? 'rolling_1_month' : '')}
+              style={{ width: 'auto' }}
+            />
+            <span>Keep last working day automatically 1 month from today</span>
+          </label>
           <input
             type="date"
+            disabled={filters.notice_period_mode === 'rolling_1_month'}
             value={filters.last_working_day || ''}
             onChange={(e) => setFilter('last_working_day', e.target.value)}
           />
           <div className="muted" style={{ fontSize: 12 }}>
-            Set this and &ldquo;notice period&rdquo; is worked out from the date every time a form
-            asks, instead of being stored as a number that is wrong tomorrow. Dropdowns get the
-            bucket the real figure falls into, always rounding <em>up</em> — claiming you can start
-            sooner than you can is the mistake that costs an offer.
+            In rolling mode JobFinder recalculates the date every day, so your notice period always
+            stays one calendar month. With a fixed date, the remaining notice period shrinks naturally
+            each day. Dropdowns always round <em>up</em> rather than claiming you can join sooner.
           </div>
         </div>
 
