@@ -2623,8 +2623,10 @@ function ProfileEditor({ profile, onChange, onSave, onDelete }) {
             {(() => {
               if (filters.notice_period_mode === 'rolling_1_month') {
                 const today = new Date();
-                const target = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-                return <span style={{ color: '#3fb950' }}> · automatically kept at <strong>1 month from today</strong> ({target.toLocaleDateString()})</span>;
+                const targetMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+                const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+                targetMonth.setDate(Math.min(today.getDate(), lastDay));
+                return <span style={{ color: '#3fb950' }}> · automatically kept at <strong>1 month from today</strong> ({targetMonth.toLocaleDateString()})</span>;
               }
               const d = filters.last_working_day;
               if (!d) return <span className="muted"> · not set — notice period comes from your answer bank instead</span>;
