@@ -9,8 +9,17 @@ export function buildKeywordQuery(profile) {
   return kws.join(' OR ');
 }
 
+export function locationList(profile) {
+  return [...new Set(
+    (profile.locations || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  )];
+}
+
 export function firstLocation(profile) {
-  return (profile.locations || '').split(',').map((s) => s.trim()).filter(Boolean)[0] || '';
+  return locationList(profile)[0] || '';
 }
 
 // A field that is not on the page must be CHEAP to miss.
