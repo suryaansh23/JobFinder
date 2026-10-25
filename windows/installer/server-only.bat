@@ -2,7 +2,7 @@
 REM JobFinder unattended server launcher. No browser window is opened by this script.
 setlocal EnableDelayedExpansion
 
-set "INSTALL_DIR=%~dp0.."
+for %%I in ("%~dp0..") do set "INSTALL_DIR=%%~fI"
 set "JOBFINDER_DATA=%APPDATA%\JobFinder"
 if not exist "%JOBFINDER_DATA%" mkdir "%JOBFINDER_DATA%"
 if not exist "%JOBFINDER_DATA%\data" mkdir "%JOBFINDER_DATA%\data"
@@ -27,6 +27,9 @@ REM Load user-specific runtime settings without putting secrets inside the insta
 if exist "%JOBFINDER_DATA%\JobFinder.env.cmd" call "%JOBFINDER_DATA%\JobFinder.env.cmd"
 
 set "PORT=3737"
+if exist "%INSTALL_DIR%\BUILD.txt" for /f "usebackq tokens=1,* delims==" %%A in ("%INSTALL_DIR%\BUILD.txt") do (
+    if /I "%%A"=="commit" set "JOBFINDER_BUILD_COMMIT=%%B"
+)
 set "HOSTNAME=127.0.0.1"
 set "NODE_PATH=%INSTALL_DIR%\app\node_modules"
 

@@ -29,5 +29,13 @@ jobs:
         run: node scripts/test-linkedin-apply-url.mjs
       - name: Regression-test unattended AUTOPILOT gate
         run: node scripts/test-autopilot.mjs
+      - name: Install browser for local application fixtures
+        run: npx playwright install --with-deps chromium
+      - name: Test application UI variants in Chromium
+        run: node --experimental-default-type=module scripts/test-linkedin-application-ui.mjs
+      - name: Test full SAFE preparation with a fixture CV and answer bank
+        run: node --experimental-default-type=module scripts/test-application-flow.mjs
+      - name: Test persisted AUTOPILOT qualification
+        run: node --experimental-default-type=module scripts/test-autopilot-storage.mjs
       - name: Production build
         run: npm run build

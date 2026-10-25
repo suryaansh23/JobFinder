@@ -18,6 +18,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
+const crypto = require('node:crypto');
 const { execSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');      // the JobFinder project
@@ -41,6 +42,16 @@ function cprf(src, dst) {
 
 async function download(url, destPath) {
   mkdirp(path.dirname(destPath));
+  // Optional local release cache for build environments whose HTTPS access is
+  // mediated by a download service/proxy. Final PE and bundle checks still run.
+  if (process.env.JOBFINDER_BUILD_CACHE) {
+    const cached = path.join(process.env.JOBFINDER_BUILD_CACHE, path.basename(new URL(url).pathname));
+    if (fs.existsSync(cached) && fs.statSync(cached).size > 0) {
+      fs.copyFileSync(cached, destPath);
+      console.log('  Reused build download cache: ' + path.basename(cached));
+      return;
+    }
+  }
   let lastError;
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
@@ -126,6 +137,7 @@ async function main() {
   // logged-in Chrome sessions — cookies, cache, history, ~12 GB) into the standalone
   // output. We move it aside for the duration of the build, then restore it.
   step('Running next build (standalone)');
+  rmrf(path.join(ROOT, '.next'));
   const dataDir = path.join(ROOT, 'data');
   const dataBackup = path.join(ROOT, '.data-build-backup');
   let dataMoved = false;
@@ -256,9 +268,13 @@ async function main() {
   cprf(path.join(HERE, 'uninstall-24x7.ps1'), path.join(DIST, 'scripts', 'uninstall-24x7.ps1'));
   cprf(path.join(HERE, 'configure-power-24x7.ps1'), path.join(DIST, 'scripts', 'configure-power-24x7.ps1'));
   cprf(path.join(HERE, 'installer', 'README.txt'), path.join(DIST, 'README.txt'));
+  let sourceCommit = process.env.GITHUB_SHA || '';
+  if (!sourceCommit) {
+    try { sourceCommit = execSync('git rev-parse HEAD', { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { sourceCommit = 'local'; }
+  }
   fs.writeFileSync(
     path.join(DIST, 'BUILD.txt'),
-    `commit=${process.env.GITHUB_SHA || 'local'}\nbuilt_at=${new Date().toISOString()}\nnode_runtime=${NODE_VERSION}\n`
+    `commit=${sourceCommit}\nbuilt_at=${new Date().toISOString()}\nnode_runtime=${NODE_VERSION}\n`
   );
 
   // 7. summary
@@ -348,6 +364,8 @@ async function main() {
   // The one-click installer sits at the ROOT of the bundle so the ZIP extracts to a
   // folder where double-clicking it is the obvious next action.
   cprf(path.join(HERE, 'installer', 'Install-JobFinder.bat'), path.join(DIST, 'Install-JobFinder.bat'));
+  cprf(path.join(HERE, 'installer', 'Update-JobFinder.bat'), path.join(DIST, 'Update-JobFinder.bat'));
+  cprf(path.join(HERE, 'installer', 'Update-JobFinder.ps1'), path.join(DIST, 'scripts', 'Update-JobFinder.ps1'));
 
   step('Verifying the bundle');
   const problems = [];
@@ -391,6 +409,21 @@ async function main() {
 
   // Ship a ZIP: one file to move to the Windows machine, and Explorer's built-in
   // "Extract All" is enough to unpack it — no third-party tool needed.
+  // The updater verifies the complete payload before stopping any running app.
+  const manifest = { preparationVersion: 'persistent-session-2026-10-25', commit: sourceCommit, files: [] };
+  function hashPayload(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) hashPayload(file);
+      else if (entry.name !== 'UPDATE-MANIFEST.json') manifest.files.push({
+        path: path.relative(DIST, file).split(path.sep).join('/'),
+        sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+      });
+    }
+  }
+  hashPayload(DIST);
+  fs.writeFileSync(path.join(DIST, 'UPDATE-MANIFEST.json'), JSON.stringify(manifest, null, 2));
+
   step('Packaging JobFinder-Windows.zip');
   const zipPath = path.join(OUT, 'JobFinder-Windows.zip');
   rmrf(zipPath);
