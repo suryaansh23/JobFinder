@@ -1,4 +1,5 @@
 import { jobId, keywordList, matchesKeywords, htmlToText, fetchJson, externalApply, toWords, withFetched } from './_util.js';
+import { relevantArbeitnowJob } from '../lib/jobRelevance.js';
 
 // Arbeitnow — open job board API (EU + remote heavy), no key required.
 // https://www.arbeitnow.com/api/job-board-api  (no server-side search; filter locally)
@@ -21,6 +22,7 @@ export default {
       if (!jobs.length) break;
       for (const j of jobs) {
         if (!j || !j.slug || !j.title) continue;
+        if (!relevantArbeitnowJob(j, profile)) continue;
         const haystack = `${j.title} ${toWords(j.tags)} ${toWords(j.job_types)} ${htmlToText(j.description, 1500)}`;
         if (!matchesKeywords(haystack, kws)) continue;
         out.push({

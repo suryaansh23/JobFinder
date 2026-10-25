@@ -23,5 +23,7 @@ jobs:
         run: npm ci
       - name: Test tracker record identity and legacy migration
         run: node scripts/test-tracker-record-ids.mjs
+      - name: Verify actionable queue routing
+        run: node scripts/test-actionable-queue.mjs
       - name: Production build
         run: npm run build
