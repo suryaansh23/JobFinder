@@ -29,6 +29,6 @@ assert.equal(trackerRecordId('linkedin:abc').length, 27);
 const proposed = new Map(repairs.map(({ row, replacement }) => [row.sheet_row, replacement]));
 const finalIds = live.map((r) => proposed.get(r.sheet_row) || r.record_id);
 assert.equal(new Set(finalIds).size, finalIds.length, 'every migrated row ID must be unique');
-assert.equal(live[123].status, 'APPLIED');
+assert.equal(live[122].status, 'APPLIED');
 assert.equal(planDuplicateTrackerIdRepair('suryansh', [{ record_id: 'unique', job_id: 'x', sheet_row: 2 }]).repairs.length, 0);
 console.log('Tracker record IDs and duplicate migration plan: PASS');
