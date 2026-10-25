@@ -28,4 +28,15 @@ const rows=[
 ];
 assert.deepEqual(selectLifoRows(rows,10,{armed:false,profile}).map(r=>r.record_id),['3','4']);
 assert.deepEqual(selectLifoRows(rows,10,{armed:false}).map(r=>r.record_id),['1','2','3','4']);
-console.log('AUTOPILOT safety gate, LIVE rollback, and application relevance checks: PASS');
+// SAFE canaries prioritize never-tested jobs. LIVE preserves newest-first.
+const canaryRows = [
+  {...rows[2], status:'NOT_APPLIED', last_attempt_at:'2026-10-25T09:00:00Z'},
+  {...rows[3], status:'NOT_APPLIED', last_attempt_at:'2026-10-25T09:10:00Z'},
+  {record_id:'5',status:'NOT_APPLIED',role:'Marketing Director',location:'Jaipur, India',source:'linkedin',
+    url:'https://linkedin.com/jobs/view/1234567895',queued_at_ms:5000,sheet_row:9,last_attempt_at:''},
+];
+assert.deepEqual(selectLifoRows(canaryRows,2,{armed:false,profile,preferUntested:true})
+  .map(r=>r.record_id),['5','3']);
+assert.deepEqual(selectLifoRows(canaryRows,2,{armed:true,profile,preferUntested:true})
+  .map(r=>r.record_id),['3','4']);
+console.log('AUTOPILOT safety gate, LIVE rollback, queue rotation, and relevance checks: PASS');
