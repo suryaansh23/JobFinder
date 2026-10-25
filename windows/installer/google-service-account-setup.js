@@ -83,6 +83,24 @@ async function verifySheetAccess(key, spreadsheetId) {
       throw new Error('Tab "' + tab + '" is missing or has unexpected headers. Check the JobFinder Master Tracker.');
     }
   }
+
+  // Confirm Editor access without altering tracker content: write the first
+  // header back to the same cell. A Viewer share must not pass setup.
+  const writeRange = encodeURIComponent("'Automation Queue'!A1");
+  const r = await fetch(
+    SPREADSHEETS + '/' + encodeURIComponent(spreadsheetId) + '/values/' + writeRange + '?valueInputOption=RAW',
+    {
+      method: 'PUT',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ range: "'Automation Queue'!A1", majorDimension: 'ROWS', values: [['record_id']] }),
+      signal: AbortSignal.timeout(30000),
+    }
+  );
+  if (!r.ok) {
+    const detail = await r.json().catch(() => ({}));
+    throw new Error('Service-account write permission failed: ' + (detail?.error?.message || r.status) +
+      '. Share the tracker as Editor with ' + key.client_email + '.');
+  }
 }
 
 function saveConfig(keySource, spreadsheetId) {
