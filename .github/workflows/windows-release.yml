@@ -63,6 +63,12 @@ jobs:
           $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
           & (Join-Path $dest "node\node.exe") (Join-Path $dest "scripts\google-sheets-setup.js") --self-test
 
+      - name: Self-test service account setup helper
+        shell: powershell
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          & (Join-Path $dest "node\node.exe") (Join-Path $dest "scripts\google-service-account-setup.js") --self-test
+
       - name: Self-test 24x7 controller
         shell: powershell
         run: |
