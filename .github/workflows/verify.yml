@@ -29,5 +29,7 @@ jobs:
         run: node scripts/test-linkedin-apply-url.mjs
       - name: Regression-test unattended AUTOPILOT gate
         run: node scripts/test-autopilot.mjs
+      - name: Verify unlimited AUTOPILOT quota opt-in
+        run: node scripts/test-application-quota.mjs
       - name: Production build
         run: npm run build
