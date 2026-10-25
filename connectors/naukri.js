@@ -18,7 +18,7 @@ export default {
 
   async scan(ctx, profile) {
     const page = await ctx.newPage();
-    const kw = (buildKeywordQuery(profile) || 'software engineer').replace(/\s+/g, '-');
+    const kw = (buildKeywordQuery(profile, { provider: 'naukri' }) || 'marketing').replace(/\s+/g, '-');
     const loc = firstLocation(profile).replace(/\s+/g, '-').toLowerCase();
     const url = `https://www.naukri.com/${encodeURIComponent(kw)}-jobs${loc ? `-in-${encodeURIComponent(loc)}` : ''}`;
 
