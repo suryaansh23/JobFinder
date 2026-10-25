@@ -39,35 +39,64 @@ function cprf(src, dst) {
   fs.cpSync(src, dst, { recursive: true, force: true, errorOnExist: false });
 }
 
-function download(url, destPath) {
-  return new Promise((resolve, reject) => {
-    mkdirp(path.dirname(destPath));
-    const file = fs.createWriteStream(destPath);
-    function get(u, redirects = 0) {
-      https.get(u, (res) => {
-        if ([301, 302, 307, 308].includes(res.statusCode)) {
-          if (redirects > 5) return reject(new Error(`Too many redirects: ${u}`));
-          return get(res.headers.location, redirects + 1);
+async function download(url, destPath) {
+  mkdirp(path.dirname(destPath));
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      await new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(destPath);
+        let settled = false;
+        function fail(err) {
+          if (settled) return;
+          settled = true;
+          file.destroy();
+          reject(err);
         }
-        if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode} from ${u}`));
-        const total = parseInt(res.headers['content-length'] || '0', 10);
-        let got = 0; let lastPct = -1;
-        res.on('data', (chunk) => {
-          got += chunk.length;
-          if (total) {
-            const pct = Math.floor((got / total) * 100);
-            if (pct !== lastPct && pct % 10 === 0) {
-              lastPct = pct;
-              process.stdout.write(`  ${pct}% (${(got / 1e6).toFixed(1)}/${(total / 1e6).toFixed(1)} MB)\r`);
+        function get(u, redirects = 0) {
+          const req = https.get(u, (res) => {
+            if ([301, 302, 307, 308].includes(res.statusCode)) {
+              const next = res.headers.location;
+              res.resume();
+              if (redirects >= 5 || !next) return fail(new Error('Too many or invalid download redirects'));
+              return get(new URL(next, u).href, redirects + 1);
             }
-          }
-        });
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve));
-      }).on('error', reject);
+            if (res.statusCode !== 200) {
+              res.resume();
+              return fail(new Error(`HTTP ${res.statusCode} from ${u}`));
+            }
+            const total = parseInt(res.headers['content-length'] || '0', 10);
+            let got = 0;
+            res.on('error', fail);
+            res.on('data', (chunk) => { got += chunk.length; });
+            res.pipe(file);
+            file.on('finish', () => {
+              if (settled) return;
+              file.close(() => {
+                if (settled) return;
+                if (total && got !== total) return fail(new Error(`Incomplete download: ${got}/${total} bytes`));
+                settled = true;
+                resolve();
+              });
+            });
+            file.on('error', fail);
+          });
+          // A release/CDN outage must not hang CI indefinitely.
+          req.setTimeout(30000, () => req.destroy(new Error('Download connection timed out')));
+          req.on('error', fail);
+        }
+        get(url);
+      });
+      return;
+    } catch (err) {
+      lastError = err;
+      rmrf(destPath);
+      if (attempt === 4) break;
+      console.warn(`  ! Download attempt ${attempt}/4 failed: ${err.message}; retrying...`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 3000));
     }
-    get(url);
-  });
+  }
+  throw lastError;
 }
 
 function sizeMb(p) {

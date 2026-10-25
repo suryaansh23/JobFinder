@@ -4,13 +4,44 @@ export function jobId(connector, externalId) {
   return `${connector}:${crypto.createHash('sha1').update(externalId).digest('hex').slice(0, 16)}`;
 }
 
-export function buildKeywordQuery(profile) {
-  const kws = (profile.keywords || '').split(',').map((s) => s.trim()).filter(Boolean);
-  return kws.join(' OR ');
+// Board search URLs must stay short. The full profile keyword list remains the
+// relevance filter; searching 60+ phrases in one request produces broken/blocked URLs.
+// Rotate across meaningful role families on successive hourly scans instead.
+const ROLE_FAMILIES = [
+  ['Brand Marketing', 'Brand Manager', 'Marketing Manager'],
+  ['Product Marketing', 'GTM Strategy', 'Marketing Strategy'],
+  ['Growth Marketing', 'Demand Generation', 'Digital Marketing'],
+  ['Marketing Consulting', 'Commercial Strategy', 'Market Research'],
+  ['Trade Marketing', 'Channel Marketing', 'Category Management'],
+  ['Influencer Marketing', 'Campaign Management', 'Consumer Insights'],
+  ['CRM Marketing', 'Customer Acquisition', 'Integrated Marketing'],
+];
+
+export function locationList(profile) {
+  return [...new Set((profile.locations || '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .filter((s) => !/^(remote|hybrid)$/i.test(s)))];
 }
 
-export function firstLocation(profile) {
-  return (profile.locations || '').split(',').map((s) => s.trim()).filter(Boolean)[0] || '';
+export function searchSlot(now = Date.now()) {
+  return Math.floor(now / 3600000);
+}
+
+export function firstLocation(profile, now = Date.now()) {
+  const locations = locationList(profile);
+  return locations.length ? locations[searchSlot(now) % locations.length] : '';
+}
+
+export function buildKeywordQuery(profile, { provider = 'linkedin', now = Date.now() } = {}) {
+  const kws = (profile.keywords || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (!kws.length) return '';
+  const group = ROLE_FAMILIES[searchSlot(now) % ROLE_FAMILIES.length];
+  const selected = group.map((role) => kws.find((k) => k.toLowerCase() === role.toLowerCase()))
+    .filter(Boolean);
+  // If the profile lacks the selected role family, use a small stable fallback.
+  const terms = selected.length ? selected : kws.slice(0, 3);
+  // Naukri expects a single search phrase in the URL slug, not "A OR B OR C".
+  return provider === 'naukri' ? terms[0] : terms.join(' OR ');
 }
 
 // A field that is not on the page must be CHEAP to miss.
