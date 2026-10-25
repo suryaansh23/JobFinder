@@ -14,6 +14,7 @@ const ROLE_FAMILIES = [
   ['Marketing Consulting', 'Commercial Strategy', 'Market Research'],
   ['Trade Marketing', 'Channel Marketing', 'Category Management'],
   ['Influencer Marketing', 'Campaign Management', 'Consumer Insights'],
+  ['CRM Marketing', 'Customer Acquisition', 'Integrated Marketing'],
 ];
 
 export function locationList(profile) {
