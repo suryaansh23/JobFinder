@@ -184,6 +184,10 @@ async function firstDryRun(profile) {
   if ((engine.rateLimited || []).length) {
     console.log('[PAUSED BY SITE] Do not repeatedly retry rate-limited boards: ' + engine.rateLimited.join(', '));
   }
+  if ((engine.uiUnavailable || []).length) {
+    console.log('[APPLICATION UI BLOCKED] Easy Apply could not open after the click/URL fallback on: '
+      + engine.uiUnavailable.join(', ') + '. Jobs are kept retryable.');
+  }
   if ((engine.deferredDetails || []).length) {
     console.log('Deferred jobs (kept retryable):');
     for (const r of engine.deferredDetails.slice(0, 20)) {
