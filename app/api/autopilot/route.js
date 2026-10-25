@@ -19,7 +19,7 @@ export const POST = withErrorHandling(async (req) => {
     throw new HttpError(409, 'AUTOPILOT is not authorized for this profile');
   }
   if (!(await trackerReady()).configured) throw new HttpError(503, 'Tracker not configured');
-  const summary = await runOrchestrator(profile.id, { armed: false, limit: 3 });
+  const summary = await runOrchestrator(profile.id, { armed: false, limit: 3, canary: true });
   const promotion = await evaluateAndAdvanceAutopilot(profile.id, summary);
   return Response.json({ ...promotion, summary: {
     selected: summary.selected,

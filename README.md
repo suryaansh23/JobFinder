@@ -58,9 +58,11 @@ you to prove you're human.
 - **Naukri early access** — the roles recruiters are searching for *before* they post
   them. There is no application form; the action is "Share Interest", and auto-apply
   treats it with the same care as a submission
-- **Scheduled runs** — repeat a batch every 20 minutes to 8 hours. Guarded by a daily
-  cap derived from applications actually sent, so no restart or second window can reset
-  it, and by a one-run-at-a-time lock
+- **Scheduled runs** — repeat application batches on a schedule, with a one-run-at-a-time
+  lock. Existing capped schedules remain supported. The Windows 24x7 AUTOPILOT controller
+  explicitly opts in to every eligible queued job without fixed per-cycle or daily
+  quotas, after its SAFE gate passes. Rate limits, login challenges, broken application
+  UIs and missing profile answers still pause or defer affected applications
 - **Salary expectations convert themselves.** One figure in your own currency becomes
   the right figure for the employer's country — at equal *purchasing power*, not at the
   exchange rate, because a straight conversion underprices you several times over. Both
@@ -73,8 +75,8 @@ you to prove you're human.
   and which redirect to the employer; LinkedIn's Easy Apply collection is walked
   separately. So a batch of 10 means 10 real attempts, not 10 postings that turn out to
   be someone else's application form
-- Capped per run, with human pacing between applications, because both sites treat a
-  burst of applications as automation
+- Human pacing between applications plus board-level pauses for rate limits and broken
+  application UIs. Unlimited AUTOPILOT removes JobFinder's count caps, not site limits
 
 **Applying**
 - **Answer bank** — captures what you type into application forms and replays it. New
