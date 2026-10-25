@@ -3,7 +3,14 @@ $ErrorActionPreference='Stop'
 function Assert-Healthy {
   $r=Invoke-RestMethod 'http://127.0.0.1:3737/api/health' -TimeoutSec 5
   if (-not $r.ok -or $r.preparationVersion -ne 'persistent-session-2026-10-25') { throw 'Expected updated healthy runtime.' }
+  $profiles=(Invoke-RestMethod 'http://127.0.0.1:3737/api/profiles' -TimeoutSec 5).profiles
+  if (-not ($profiles | Where-Object { $_.id -eq $FixtureProfileId -and $_.name -eq 'Updater preservation fixture' })) {
+    throw 'Update or rollback did not preserve the candidate profile in SQLite'
+  }
 }
+$fixtureBody=@{name='Updater preservation fixture';email='fixture@example.test';keywords='Brand Marketing';locations='Delhi NCR'} | ConvertTo-Json
+$FixtureProfileId=(Invoke-RestMethod 'http://127.0.0.1:3737/api/profiles' -Method Post -ContentType 'application/json' -Body $fixtureBody -TimeoutSec 5).id
+if (-not $FixtureProfileId) { throw 'Could not seed the SQLite profile preservation check' }
 $sentinel=Join-Path $env:APPDATA 'JobFinder\update-preservation-sentinel.txt'
 Set-Content -LiteralPath $sentinel -Value 'fixture candidate data must survive updates'
 $before=(Get-FileHash -LiteralPath $sentinel).Hash
