@@ -96,6 +96,8 @@ for (const rel of [
   'scripts/post-install-models.ps1',
   'scripts/google-sheets-setup.js',
   'scripts/configure-google-sheets.bat',
+  'scripts/google-service-account-setup.js',
+  'scripts/configure-google-service-account.bat',
   'scripts/JobFinder.env.cmd.example',
   'scripts/24x7-control.js',
   'scripts/24x7-control.bat',
