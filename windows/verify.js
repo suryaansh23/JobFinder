@@ -107,6 +107,9 @@ for (const rel of [
   'scripts/configure-power-24x7.ps1',
   'Install-JobFinder.bat',
   'BUILD.txt',
+  'UPDATE-MANIFEST.json',
+  'Update-JobFinder.bat',
+  'scripts/Update-JobFinder.ps1',
 ]) {
   if (fs.existsSync(path.join(DIST, rel))) ok.push(rel);
   else problems.push(`${rel} missing from the bundle root`);

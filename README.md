@@ -1,5 +1,7 @@
 # JobFinder
 
+For Suryansh’s Windows automation and the consolidated updater, see [AUTOPILOT setup](docs/AUTOPILOT.md).
+
 A local-first job-application assistant. It scans 19 job boards, scores each posting
 against your CV, fills in application forms from an answer bank you approve, and builds
 evidence-based interview prep from the job descriptions you actually saved.

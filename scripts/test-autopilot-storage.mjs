@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+globalThis.require=createRequire(import.meta.url);
+const work=fs.mkdtempSync(path.join(os.tmpdir(),'jf-policy-'));
+process.env.JOBFINDER_DATA=work;
+const {run,get}=await import('../lib/db.js');
+const {setOrchestratorSchedule,readOrchestratorSchedule,stopOrchestratorSchedule}=await import('../lib/orchestratorScheduler.js');
+const {beginOrchestratorRun,finishOrchestratorRun}=await import('../lib/orchestratorStore.js');
+const {runOrchestrator}=await import('../lib/orchestrator.js');
+const {PREPARATION_VERSION}=await import('../lib/orderedApplications.js');
+const pid='fixture';
+await run('INSERT INTO profiles (id,name,filters,created_at) VALUES (?,?,?,?)',[pid,'Fixture','{}',Date.now()]);
+try {
+ await setOrchestratorSchedule(pid,{enabled:true,armed:false,autopilotConsent:true,promoteWhenReady:true});
+ await assert.rejects(()=>setOrchestratorSchedule(pid,{armed:true}),/no recent passing SAFE/);
+ await assert.rejects(()=>runOrchestrator(pid,{armed:true}),/LIVE needs a current passing/);
+ const id=await beginOrchestratorRun(pid,{armed:false,selected:[]});
+ await finishOrchestratorRun(id,{selected:2,preparationVersion:PREPARATION_VERSION,channels:[{channel:'naukri',selected:2,prepared:2,errors:0,blocked:[]}]});
+ const live=await setOrchestratorSchedule(pid,{armed:true});
+ assert.deepEqual(live.liveChannels,['naukri']);
+ assert.equal(live.preparationVersion,PREPARATION_VERSION);
+ assert.equal(readOrchestratorSchedule(await get('SELECT * FROM profiles WHERE id=?',[pid])).armed,true,'qualification persisted');
+ const prior={...live,preparationVersion:'older-engine'};
+ await run('UPDATE profiles SET filters=? WHERE id=?',[JSON.stringify({orchestrator_schedule:prior}),pid]);
+ const afterUpdate=readOrchestratorSchedule(await get('SELECT * FROM profiles WHERE id=?',[pid]));
+ assert.equal(afterUpdate.armed,false,'new engine revokes older readiness proof');
+ assert.equal(afterUpdate.promoteWhenReady,true,'one-time authorization survives engine updates');
+ const expired={...live,qualifiedAt:Date.now()-25*3600000};
+ assert.equal(readOrchestratorSchedule({filters:JSON.stringify({orchestrator_schedule:expired})}).armed,false,'stale proof expires');
+ await setOrchestratorSchedule(pid,{enabled:false,armed:false});
+ const paused=readOrchestratorSchedule(await get('SELECT * FROM profiles WHERE id=?',[pid]));
+ assert.equal(paused.autopilotConsent,false);
+ assert.deepEqual(paused.liveChannels,[]);
+ console.log('Persisted AUTOPILOT: gate, provider isolation, update/age invalidation and pause: PASS');
+} finally { stopOrchestratorSchedule(pid);fs.rmSync(work,{recursive:true,force:true}); }

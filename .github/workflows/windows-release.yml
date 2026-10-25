@@ -38,6 +38,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: JobFinder-Windows
@@ -109,6 +110,14 @@ jobs:
           $r = Invoke-RestMethod -Uri "http://127.0.0.1:3737/api/health" -TimeoutSec 5
           if ($r.db -ne "ok") { throw "Database health failed" }
           Write-Host "Health OK. Backend=$($r.backend) PID=$($r.pid)"
+
+      - name: Verify consolidated updater and automatic rollback
+        shell: powershell
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP "JobFinderStage\JobFinder"
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          & .\scripts\test-windows-update.ps1 -Source $source -InstallDir $dest
+          if ($LASTEXITCODE -ne 0) { throw "Updater smoke checks failed" }
 
       - name: Cleanup watchdog
         if: always()

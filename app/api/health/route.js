@@ -1,5 +1,6 @@
 import { backendName, get } from '../../../lib/db.js';
 import { ensureSchedulerStarted } from '../../../lib/schedulerBoot.js';
+import { PREPARATION_VERSION } from '../../../lib/orderedApplications.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,5 +22,7 @@ export async function GET() {
     pid: process.pid,
     uptime_seconds: Math.floor(process.uptime()),
     now: Date.now(),
+    preparationVersion: PREPARATION_VERSION,
+    build_commit: process.env.JOBFINDER_BUILD_COMMIT || 'development',
   }, { status: db === 'ok' ? 200 : 503 });
 }

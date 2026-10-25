@@ -182,6 +182,7 @@ async function firstDryRun(profile) {
     return acc;
   }, {});
   if (Object.keys(outs).length) console.log('Recorded outcomes: ' + JSON.stringify(outs));
+  for (const c of run.channels || []) console.log('Provider ' + c.channel + ': prepared ' + c.prepared + ', errors ' + c.errors + ', blockers ' + c.blocked.join(', '));
   if ((engine.loginRequired || []).length) {
     console.log('[ACTION REQUIRED] Sign in or verify LinkedIn/Naukri through the JobFinder dashboard: ' + engine.loginRequired.join(', '));
   }
@@ -198,7 +199,7 @@ async function firstDryRun(profile) {
       console.log(`  - ${String(r.company || '').slice(0, 55)} | ${String(r.title || '').slice(0, 70)} | ${r.state}: ${String(r.note || '').slice(0, 160)}`);
     }
   }
-  if (!Number(engine.dryRun || 0)) {
+  if (!Number(engine.dryRun || 0) && !Number(run.ats?.dryRun || 0)) {
     console.log('[NOT READY FOR LIVE] No application form has yet passed the safe preparation check.');
   }
   return run;
@@ -231,7 +232,7 @@ async function main() {
     console.log('4. Pause 24x7 orchestrator');
     console.log('5. Open dashboard');
     console.log('0. Exit');
-    const choice = (await rl.question('Choose: ')).trim();
+    const choice = process.argv.includes('--autopilot') ? '6' : (await rl.question('Choose: ')).trim();
 
     if (choice === '1') {
       const s = await scheduleStatus(profile.id);
@@ -297,6 +298,7 @@ async function main() {
         });
         console.log('Readiness: ' + (result.gate?.reason || 'No result'));
         console.log('Prepared forms: ' + (result.gate?.prepared || 0));
+        console.log('Verified providers: ' + (result.gate?.qualifiedChannels || []).join(', '));
         console.log(result.promoted
           ? 'LIVE AUTOMATION ARMED: tested forms passed; real submissions start on the next scheduled cycle.'
           : 'AUTOPILOT ACTIVE IN SAFE: self-tests repeat automatically; no more manual dry-runs needed.');
