@@ -118,13 +118,15 @@ async function scheduleStatus(profileId) {
   return api(`/api/orchestrator-schedule?profile_id=${encodeURIComponent(profileId)}`);
 }
 
-async function setSchedule(profileId, armed) {
+async function setSchedule(profileId, armed, autopilot = false) {
   return api('/api/orchestrator-schedule', {
     method: 'PUT',
     body: {
       profile_id: profileId,
       enabled: true,
       armed,
+      promoteWhenReady: autopilot && !armed,
+      autopilotConsent: autopilot,
       everyMinutes: 60,
       limit: 10,
       dailyCap: 30,
@@ -141,6 +143,8 @@ async function pause(profileId) {
       profile_id: profileId,
       enabled: false,
       armed: false,
+      promoteWhenReady: false,
+      autopilotConsent: false,
       everyMinutes: 60,
       limit: 10,
       dailyCap: 30,
@@ -222,7 +226,8 @@ async function main() {
     console.log('');
     console.log('1. Show 24x7 schedule status');
     console.log('2. Enable SAFE 24x7 dry-run + start first cycle now');
-    console.log('3. ARM LIVE 24x7 applications');
+    console.log('3. ARM LIVE 24x7 applications (only after passing SAFE gate)');
+    console.log('6. AUTOPILOT: activate once, self-test hourly, LIVE when ready');
     console.log('4. Pause 24x7 orchestrator');
     console.log('5. Open dashboard');
     console.log('0. Exit');
@@ -265,6 +270,41 @@ async function main() {
       }
       await setSchedule(profile.id, true);
       console.log('LIVE 24x7 orchestrator is ARMED.');
+      return;
+    }
+
+    if (choice === '6') {
+      if (!ready.sheetLive || !ready.hasCv || !ready.keywords || !ready.locations) {
+        throw new Error('AUTOPILOT needs a connected Sheet, CV, keywords and locations. Check the readiness summary.');
+      }
+      console.log('');
+      console.log('AUTOPILOT performs automatic SAFE checks until at least two eligible job forms pass.');
+      console.log('After passing, it may SEND REAL applications (maximum 10 per cycle; 30 per day).');
+      console.log('If a board becomes blocked, LIVE suspends automatically and SAFE checks continue.');
+      console.log('Discovery and tracker sync continue hourly while your PC and JobFinder server are running.');
+      console.log('');
+      const confirm = (await rl.question('Type AUTOPILOT to authorize future submissions after the gate passes: ')).trim();
+      if (confirm !== 'AUTOPILOT') {
+        console.log('No change. Real submissions were not authorized.');
+        return;
+      }
+      await setSchedule(profile.id, false, true);
+      console.log('AUTOPILOT SAVED: SAFE hourly discovery + readiness checks enabled.');
+      console.log('Testing existing queued jobs once now; no scan is needed before the first test.');
+      try {
+        const result = await api('/api/autopilot', {
+          method: 'POST', body: { profile_id: profile.id }, timeoutMs: 15 * 60 * 1000,
+        });
+        console.log('Readiness: ' + (result.gate?.reason || 'No result'));
+        console.log('Prepared forms: ' + (result.gate?.prepared || 0));
+        console.log(result.promoted
+          ? 'LIVE AUTOMATION ARMED: tested forms passed; real submissions start on the next scheduled cycle.'
+          : 'AUTOPILOT ACTIVE IN SAFE: self-tests repeat automatically; no more manual dry-runs needed.');
+      } catch (e) {
+        console.log('One-time readiness probe: ' + String(e?.message || e));
+        console.log('AUTOPILOT remains in SAFE and will retry automatically on its hourly schedule.');
+      }
+      console.log('Check option 1 any time for LIVE / AUTO-QUALIFYING status.');
       return;
     }
 

@@ -21,6 +21,8 @@ export const PUT = withErrorHandling(async (req) => {
   const cfg = await setOrchestratorSchedule(body.profile_id, {
     enabled: body.enabled,
     armed: body.armed,
+    promoteWhenReady: body.promoteWhenReady,
+    autopilotConsent: body.autopilotConsent,
     everyMinutes: body.everyMinutes,
     limit: body.limit,
     dailyCap: body.dailyCap,

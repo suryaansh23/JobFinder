@@ -27,5 +27,7 @@ jobs:
         run: node scripts/test-actionable-queue.mjs
       - name: Test safe LinkedIn apply fallbacks
         run: node scripts/test-linkedin-apply-url.mjs
+      - name: Regression-test unattended AUTOPILOT gate
+        run: node scripts/test-autopilot.mjs
       - name: Production build
         run: npm run build
