@@ -2,7 +2,7 @@
 REM JobFinder unattended server launcher. No browser window is opened by this script.
 setlocal EnableDelayedExpansion
 
-set "INSTALL_DIR=%~dp0.."
+for %%I in ("%~dp0..") do set "INSTALL_DIR=%%~fI"
 set "JOBFINDER_DATA=%APPDATA%\JobFinder"
 if not exist "%JOBFINDER_DATA%" mkdir "%JOBFINDER_DATA%"
 if not exist "%JOBFINDER_DATA%\data" mkdir "%JOBFINDER_DATA%\data"

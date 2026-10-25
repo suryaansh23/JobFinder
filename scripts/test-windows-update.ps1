@@ -7,9 +7,13 @@ function Assert-Healthy {
 $sentinel=Join-Path $env:APPDATA 'JobFinder\update-preservation-sentinel.txt'
 Set-Content -LiteralPath $sentinel -Value 'fixture candidate data must survive updates'
 $before=(Get-FileHash -LiteralPath $sentinel).Hash
+$originalServer=(Invoke-RestMethod 'http://127.0.0.1:3737/api/health').pid
 & (Join-Path $Source 'scripts\Update-JobFinder.ps1') -Source $Source -InstallDir $InstallDir
 if ($LASTEXITCODE -ne 0) { throw 'Valid update failed' }
 Assert-Healthy
+$updatedServer=(Invoke-RestMethod 'http://127.0.0.1:3737/api/health').pid
+if ($originalServer -eq $updatedServer) { throw 'Update did not restart the server process' }
+Write-Host "Update restarted server: $originalServer -> $updatedServer"
 if ((Get-FileHash -LiteralPath $sentinel).Hash -ne $before) { throw 'Update changed candidate data' }
 
 $broken=Join-Path $env:RUNNER_TEMP ('BrokenUpdate-'+[Guid]::NewGuid().ToString('N'))

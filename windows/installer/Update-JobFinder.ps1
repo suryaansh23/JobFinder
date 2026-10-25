@@ -18,13 +18,25 @@ $InstalledNew = $false
 $StoppedRuntime = $false
 $Task = $null
 $TaskEnabled = $false
+$StoppedServerInstances = @{}
 
-function Stop-InstalledServer {
-  $server = Join-Path $InstallDir 'app\server.js'
+function Get-InstalledServerProcess {
+  $prefix = $InstallDir + '\'
   Get-CimInstance Win32_Process | Where-Object {
     $_.Name -ieq 'node.exe' -and $_.CommandLine -and
-    $_.CommandLine.IndexOf($server, [StringComparison]::OrdinalIgnoreCase) -ge 0
-  } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    $_.CommandLine.Replace('/','\').IndexOf($prefix, [StringComparison]::OrdinalIgnoreCase) -ge 0 -and
+    $_.CommandLine -match '[\\/]app[\\/]server\.js(?:["\s]|$)'
+  }
+}
+function Stop-InstalledServer {
+  $servers = @(Get-InstalledServerProcess)
+  foreach ($server in $servers) {
+    $StoppedServerInstances[[string]$server.ProcessId] = $server.CreationDate
+    Stop-Process -Id $server.ProcessId -Force -ErrorAction SilentlyContinue
+  }
+  $deadline = (Get-Date).AddSeconds(15)
+  while ((Get-InstalledServerProcess) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+  if (Get-InstalledServerProcess) { throw 'The existing JobFinder server could not be stopped. The installed files were retained.' }
 }
 function Start-InstalledServer {
   $launcher = Join-Path $InstallDir 'scripts\server-only.bat'
@@ -35,7 +47,10 @@ function Wait-Healthy([bool]$CheckVersion) {
   do {
     try {
       $h = Invoke-RestMethod 'http://127.0.0.1:3737/api/health' -TimeoutSec 3
-      if ($h.ok -and $h.db -eq 'ok' -and ((-not $CheckVersion) -or
+      $instance = Get-InstalledServerProcess | Where-Object { $_.ProcessId -eq $h.pid } | Select-Object -First 1
+      $fresh = $instance -and ((-not $StoppedServerInstances.ContainsKey([string]$h.pid)) -or
+        $instance.CreationDate -ne $StoppedServerInstances[[string]$h.pid])
+      if ($fresh -and $h.ok -and $h.db -eq 'ok' -and ((-not $CheckVersion) -or
           ($h.preparationVersion -eq $ExpectedVersion -and $h.build_commit -eq $ExpectedCommit))) { return $true }
     } catch {}
     Start-Sleep -Seconds 1
