@@ -25,5 +25,7 @@ jobs:
         run: node scripts/test-tracker-record-ids.mjs
       - name: Verify actionable queue routing
         run: node scripts/test-actionable-queue.mjs
+      - name: Test safe LinkedIn apply fallbacks
+        run: node scripts/test-linkedin-apply-url.mjs
       - name: Production build
         run: npm run build
