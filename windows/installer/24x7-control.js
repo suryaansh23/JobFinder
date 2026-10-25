@@ -128,8 +128,8 @@ async function setSchedule(profileId, armed, autopilot = false) {
       promoteWhenReady: autopilot && !armed,
       autopilotConsent: autopilot,
       everyMinutes: 60,
-      limit: 10,
-      dailyCap: 30,
+      limit: null,
+      dailyCap: null,
       scan: true,
       scanEveryMinutes: 60,
     },
@@ -146,8 +146,8 @@ async function pause(profileId) {
       promoteWhenReady: false,
       autopilotConsent: false,
       everyMinutes: 60,
-      limit: 10,
-      dailyCap: 30,
+      limit: null,
+      dailyCap: null,
       scan: true,
       scanEveryMinutes: 60,
     },
@@ -247,7 +247,7 @@ async function main() {
       if (!ready.locations) console.log('[!] Locations are empty. The scan may include locations you do not want.');
 
       await setSchedule(profile.id, false);
-      console.log('SAFE 24x7 schedule enabled: hourly scan, up to 10 dry-run applications per cycle.');
+      console.log('SAFE 24x7 schedule enabled: hourly scan, all eligible queued dry-run applications per cycle.');
       const now = (await rl.question('Start the first scan + dry run now? [Y/n]: ')).trim();
       if (now.toLowerCase() !== 'n') await firstDryRun(profile);
       return;
@@ -262,7 +262,7 @@ async function main() {
       }
       console.log('');
       console.log('LIVE mode sends real applications without someone watching the browser.');
-      console.log('Daily cap: 30 confirmed applications. Per-cycle cap: 10.');
+      console.log('No fixed application cap per cycle or per day. Eligible jobs retain pacing and duplicate protection.');
       const confirm = (await rl.question('Type LIVE to arm real submissions: ')).trim();
       if (confirm !== 'LIVE') {
         console.log('Live mode not armed.');
@@ -279,7 +279,7 @@ async function main() {
       }
       console.log('');
       console.log('AUTOPILOT performs automatic SAFE checks until at least two eligible job forms pass.');
-      console.log('After passing, it may SEND REAL applications (maximum 10 per cycle; 30 per day).');
+      console.log('After passing, it may SEND REAL applications to all eligible jobs (no fixed per-cycle or daily cap).');
       console.log('If a board becomes blocked, LIVE suspends automatically and SAFE checks continue.');
       console.log('Discovery and tracker sync continue hourly while your PC and JobFinder server are running.');
       console.log('');
@@ -297,6 +297,13 @@ async function main() {
         });
         console.log('Readiness: ' + (result.gate?.reason || 'No result'));
         console.log('Prepared forms: ' + (result.gate?.prepared || 0));
+        const test = result.summary || {};
+        console.log(`Canary routing: selected ${test.selected || 0}, supported ${test.routed || 0}, needs input ${test.needsInput || 0}.`);
+        for (const blocked of (test.blocked || []).slice(0, 5)) {
+          console.log('Form issue: ' + String(blocked.company || '') + ' | '
+            + String(blocked.state || '') + ' | ' + String(blocked.note || '').slice(0, 180));
+        }
+        for (const blocker of (result.gate?.blocked || [])) console.log('SAFE gate blocker: ' + blocker);
         console.log(result.promoted
           ? 'LIVE AUTOMATION ARMED: tested forms passed; real submissions start on the next scheduled cycle.'
           : 'AUTOPILOT ACTIVE IN SAFE: self-tests repeat automatically; no more manual dry-runs needed.');
