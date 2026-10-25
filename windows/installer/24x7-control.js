@@ -169,6 +169,30 @@ async function firstDryRun(profile) {
     timeoutMs: 15 * 60 * 1000,
   });
   console.log(`Dry run: selected ${run.selected || 0}, ready/held ${run.engine?.dryRun || 0}, action required ${run.actionRequired || 0}.`);
+  const engine = run.engine || {};
+  console.log(`Routing: LinkedIn/Naukri ${run.boardAutomatable || 0}, ATS ${run.atsAutomatable || 0}, unsupported ${run.unsupported || 0}.`);
+  console.log(`Engine: prepared ${engine.dryRun || 0}, deferred ${engine.deferred || 0}, errors ${engine.errors || 0}, needs input ${engine.needsInput || 0}.`);
+  const outs = (engine.results || []).reduce((acc, r) => {
+    const key = String(r.state || 'unknown');
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  if (Object.keys(outs).length) console.log('Recorded outcomes: ' + JSON.stringify(outs));
+  if ((engine.loginRequired || []).length) {
+    console.log('[ACTION REQUIRED] Sign in or verify LinkedIn/Naukri through the JobFinder dashboard: ' + engine.loginRequired.join(', '));
+  }
+  if ((engine.rateLimited || []).length) {
+    console.log('[PAUSED BY SITE] Do not repeatedly retry rate-limited boards: ' + engine.rateLimited.join(', '));
+  }
+  if ((engine.deferredDetails || []).length) {
+    console.log('Deferred jobs (kept retryable):');
+    for (const r of engine.deferredDetails.slice(0, 20)) {
+      console.log(`  - ${String(r.company || '').slice(0, 55)} | ${String(r.title || '').slice(0, 70)} | ${r.state}: ${String(r.note || '').slice(0, 160)}`);
+    }
+  }
+  if (!Number(engine.dryRun || 0)) {
+    console.log('[NOT READY FOR LIVE] No application form has yet passed the safe preparation check.');
+  }
   return run;
 }
 
