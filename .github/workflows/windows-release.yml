@@ -76,6 +76,16 @@ jobs:
           $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
           & (Join-Path $dest "node\node.exe") (Join-Path $dest "scripts\24x7-control.js") --self-test
 
+      - name: Reproduce the previous Windows launcher path
+        shell: powershell
+        run: |
+          $dest = Join-Path $env:LOCALAPPDATA "Programs\JobFinder"
+          $launcher = Join-Path $dest "scripts\server-only.bat"
+          $text = Get-Content -LiteralPath $launcher -Raw
+          $canonical = 'for %%I in ("%~dp0..") do set "INSTALL_DIR=%%~fI"'
+          if (-not $text.Contains($canonical)) { throw "Expected canonical launcher assignment" }
+          $text.Replace($canonical, 'set "INSTALL_DIR=%~dp0.."') | Set-Content -LiteralPath $launcher -Encoding ASCII
+
       - name: Start 24x7 watchdog
         shell: powershell
         run: |
